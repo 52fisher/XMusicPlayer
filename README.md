@@ -1,6 +1,10 @@
 # xiaoMusicPlayer
 
-This template should help get you started developing with Vue 3 in Vite.
+这是一个为xiaomusic写的一个移动端的播放器主题
+
+![图片](https://github.com/user-attachments/assets/8c328c3b-ad78-4995-9dab-972a6f9b970a)
+![图片](https://github.com/user-attachments/assets/2ed8950a-0dbe-49e8-bd50-ed709cc1948a)
+![图片](https://github.com/user-attachments/assets/acd6117b-ad2b-4004-82cb-4b71d2727c0b)
 
 ## Recommended IDE Setup
 
