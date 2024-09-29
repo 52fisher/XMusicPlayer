@@ -33,14 +33,11 @@
                 </div>
             </div>
 
-                <player :currentTrack="currentTrack" @next-track="nextTrack" @prev-track="prevTrack"
-                    @random-track="randomTrack" :isMiniPlayer="miniToggle"
-                    @toggle-mini-player="miniToggle = !miniToggle" ref="xplayer"
-                    @handle-play="handlePlay"
-                    @change-device="changeDevice"
-                    >
+            <player :currentTrack="currentTrack" @next-track="nextTrack" @prev-track="prevTrack"
+                @random-track="randomTrack" :isMiniPlayer="miniToggle" @toggle-mini-player="miniToggle = !miniToggle"
+                ref="xplayer" @handle-play="handlePlay" @change-device="changeDevice">
 
-                </player>
+            </player>
         </div>
     </div>
 </template>
@@ -69,9 +66,9 @@ const total = computed(() => {
 //当前设备，默认本机
 const currentDevice = ref({ name: "本机", did: "" });
 localforage.getItem('currentDevice').then((value) => {
-  if (value) {
-    currentDevice.value = value
-  }
+    if (value) {
+        currentDevice.value = value
+    }
 })
 //音乐组件是否最小化
 const miniToggle = ref(true) //true最小化
@@ -91,7 +88,7 @@ const handleLazyImage = (target) => {
         if (!data.value) return
 
         //检查data是否有tags，有就拿到tags，没有就拿到默认图片
-        data.value.tags.picture && (img.src = data.value.tags.picture?.replace('/cache/picture_cache',""));
+        data.value.tags.picture && (img.src = data.value.tags.picture?.replace('/cache/picture_cache', ""));
         //如果为空则不要填写
         span.innerText = [data.value.tags.artist, data.value.tags.album, data.value.tags.title].filter(Boolean).join('-');
         //把以上标签信息存到img对应名字的的dataset中
@@ -106,13 +103,27 @@ const handlePlay = (name) => {
     //如果currentDevice的did不为空，则应该在小爱设备上进行播放
     console.log('%csrc\views\ListView.vue:104 currentDevice', 'color: #007acc;', currentDevice);
     if (currentDevice.value.did) {
-       const { data:res } = useFetch(ApiList.sendCmd).post({
+        const { data: res } = useFetch(ApiList.sendCmd).post({
             did: currentDevice.value.did,
-            cmd: '播放列表'+ title + "|" +name
-       }).json()
+            cmd: '播放列表' + title + "|" + name
+        }).json()
         watch(() => res.value, (value) => {
             if (!value) return
             res.ret == "OK" //后面再执行逻辑
+        })
+        let { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
+        watch(() => data.value, (value) => {
+            if (!data.value) return
+            currentTrack.value = {
+                name: data.value.name,
+                url: '',
+                album: data.value.tags.album,
+                cover: data.value.tags.picture,
+                lyric: data.value.tags.lyrics,
+                singer: data.value.tags.artist,
+            }
+            //保存currentTrack
+            localforage.setItem('currentTrack', toRaw(currentTrack.value))
         })
         return;
     }
@@ -123,7 +134,7 @@ const handlePlay = (name) => {
             name: data.value.name,
             url: data.value.url,
             album: data.value.tags.album,
-            cover: data.value.tags.picture?.replace('/cache/picture_cache',""),
+            cover: data.value.tags.picture,
             lyric: data.value.tags.lyrics,
             singer: data.value.tags.artist,
         }
@@ -157,7 +168,7 @@ const randomTrack = () => {
     handlePlay(list.value[index])
 }
 const changeDevice = (item) => {
-  currentDevice.value = item
+    currentDevice.value = item
 }
 onMounted(() => {
     listRefs.forEach((item, index) => {

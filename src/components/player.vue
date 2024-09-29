@@ -208,8 +208,10 @@ setInterval(() => {
   if (currentDevice.value.did) {
     const { data: res } = useFetch(ApiList.playingMusic + currentDevice.value.did).get().json()
     watch(() => res.value, (value) => {
-      if(res.value.ret=="OK"&&res.value.is_playing){
+      if (res.value.ret == "OK" && res.value.is_playing) {
+        duration.value = res.value.duration
         currentTime.value = res.value.offset * duration.value / 100
+        updateLyricOffset();
       }
     },{once:true})
   }
@@ -223,6 +225,9 @@ const setTimer = (item) => {
     }).json()
   }
 }
+watch(()=>currentTrack.value.cover,(value)=>{
+  audioState.value.src = value
+})
 // 监听音频元数据加载完成
 const onLoadedMetadata = (event) => {
   // const audio = event.target;
@@ -406,6 +411,7 @@ watchEffect(() => {
     currentTrack.value.cover && (fullCover.value.src = currentTrack.value.cover);
   }
 })
+
 </script>
 
 <style scoped lang="scss">
