@@ -3,12 +3,41 @@
     <div class="music_player_box">
       <audio ref="audio" :src="currentTrack.url" @loadedmetadata="onLoadedMetadata" @timeupdate="updateCurrentTime"
         @ended="handleTrackEnd" autoplay></audio>
+      <!-- 标题、收藏 -->
+
+      <!-- 设备投放选择 -->
+      <div class="device_setting" v-if="!isMiniPlayer">
+        <div class="current_device_name">{{ currentDevice.name }}</div>
+        <div class="shutdown" @click="timerSwitch = true" v-if="currentDevice.did">
+          <IconTimer />
+          <ModalDialog @close="timerSwitch = false" v-if="timerSwitch">
+            <template #title>选择定时关闭的时间</template>
+            <template #content>
+              <div v-for="item in ['10分钟',  '30分钟', '60分钟']" :key="item" @click="setTimer(item)">
+                  {{ item }}
+              </div>
+            </template>
+          </ModalDialog>
+        </div>
+        <div class="cast_device" @click="devicesSwitch = true">
+            <IconDevice />
+            <ModalDialog @close="devicesSwitch = false" v-if="devicesSwitch">
+              <template #title>选择投放设备</template>
+              <template #content>
+                <div v-for="item in devices" :key="item.name" @click="changeDevice(item)">
+                    {{ item.name }}
+                </div>
+              </template>
+            </ModalDialog>
+        </div>
+
+      </div>
       <!-- 歌曲进度条 -->
-      <div class="progress-bar" v-if="!isMiniPlayer">
+      <div class="progress_bar" v-if="!isMiniPlayer">
         <input type="range" :max="duration" :value="currentTime" @input="seek" step="0.1" />
       </div>
       <!-- 显示当前歌曲时间 -->
-      <div class="time-display" v-if="!isMiniPlayer">
+      <div class="time_display" v-if="!isMiniPlayer">
         <div class="current_time">{{ formatTime(currentTime) }}</div>
         <div class="duration">{{ formatTime(duration) }}</div>
       </div>
@@ -41,14 +70,25 @@
 
     </div>
     <!-- 显示歌词 -->
-    <div class="lyrics-container" ref="lyricsContainer" v-if="!isMiniPlayer">
-      <div class="lyrics" :style="{ top: lyricOffset }">
-        <div v-for="(line, index) in currentLyric" :key="index" :class="isCurrentLine(index) ? 'current' : ''" v-if="currentLyric.length > 0">
+    <div class="lyrics-container wordType" ref="lyricsContainer" v-if="!isMiniPlayer">
+      <div class="lyrics" :style="{ top: lyricOffset }" v-if="currentLyric.length > 0">
+        <div v-for="(line, index) in currentLyric" :key="index" :class="isCurrentLine(index) ? 'current' : ''">
           {{ line.text }}
         </div>
-        <div v-else>暂无歌词，请欣赏音乐吧</div>
       </div>
+      <div v-else class="lyrics_none">暂无歌词，请欣赏音乐吧</div>
     </div>
+    <!-- 歌曲信息 -->
+    <div class="music_info " v-if="!isMiniPlayer">
+      <div class="music_name">
+        <div class="music_title wordType">{{ currentTrack.name }}</div>
+        <div class="music_star" v-if="currentDevice.did">
+          <IconStar />
+        </div>
+      </div>
+      <div class="music_singer">{{ currentTrack.singer }}</div>
+    </div>
+    <!-- 封面 -->
     <div class="cover_wrapper" v-if="!isMiniPlayer">
       <img src="/defaultcover.jpg" alt="" class="cover" ref="fullCover">
     </div>
@@ -61,18 +101,22 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useStorage, useSwipe } from '@vueuse/core'
-import IconMusicPlay from '../components/icons/IconMusicPlay.vue'
-import IconMusicPause from '../components/icons/IconMusicPause.vue'
-import IconMusicNext from '../components/icons/IconMusicNext.vue'
-import IconMusicPrev from '../components/icons/IconMusicPrev.vue'
-import IconRepeatAll from '../components/icons/IconRepeatAll.vue'
-import IconRepeatOne from '../components/icons/IconRepeatOne.vue'
-import IconRandom from '../components/icons/IconRandom.vue'
-import IconShrink from '../components/icons/IconShrink.vue'
-
-const emit = defineEmits(['prev-track', 'next-track', 'random-track'])
-const currentTrackIndex = ref(0);
+import { useFetch, useStorage } from '@vueuse/core'
+import IconMusicPlay from './icons/IconMusicPlay.vue'
+import IconMusicPause from './icons/IconMusicPause.vue'
+import IconMusicNext from './icons/IconMusicNext.vue'
+import IconMusicPrev from './icons/IconMusicPrev.vue'
+import IconRepeatAll from './icons/IconRepeatAll.vue'
+import IconRepeatOne from './icons/IconRepeatOne.vue'
+import IconRandom from './icons/IconRandom.vue'
+import IconShrink from './icons/IconShrink.vue'
+import IconDevice from './icons/IconDevice.vue'
+import IconStar from './icons/IconStar.vue'
+import IconTimer from './icons/IconTimer.vue'
+import localforage from 'localforage'
+import ModalDialog from './ModalDialog.vue'
+import ApiList from './ApiList.vue'
+const emit = defineEmits(['prev-track', 'next-track', 'random-track','handle-play','change-device'])
 const playState = ref(false);
 const volume = ref(0.5);
 // const loopType = ref('sequence');
@@ -91,7 +135,20 @@ const lyricOffset = ref(0);
 const lyricsContainer = ref(null);
 
 const currentTrack = computed(() => props.currentTrack);
-
+const devices = ref([]);
+const devicesSwitch = ref(false)
+const timerSwitch = ref(false)
+const currentDevice = ref({name:"本机",did:""});
+localforage.getItem('devices').then((value) => {
+  if (value) {
+    devices.value = value
+  }
+})
+localforage.getItem('currentDevice').then((value) => {
+  if (value) {
+    currentDevice.value = value
+  }
+})
 const props = defineProps({
   currentTrack: {
     type: Object,
@@ -115,13 +172,64 @@ const toggleLoopType = () => {
 const toggleMiniPlayer = () => {
   emit('toggle-mini-player')
 }
+
+const changeDevice = (item) => {
+  //更更换设备应该立即暂停音乐
+  console.log('%csrc\components\Player.vue:169 playState.value', 'color: #007acc;', playState.value);
+  if (playState.value!==true) {
+    audio.value.pause()
+  }
+  devicesSwitch.value = false
+  currentDevice.value = item
+  // console.log('%csrc\components\Player.vue:169 item', 'color: #007acc;', item);
+  //若更改的设备不是本地(did为空)，则要立即通过ApiList拉取音量
+  if (item.did) {
+    const { data: deviceVolume } = useFetch(ApiList.getVolume + item.did).get().json()
+    watch(() => volume.value, (value) => {
+      volume.value = parseInt(deviceVolume.value) / 100;
+    },{once:true})
+  }
+  
+  localforage.setItem('currentDevice', toRaw(item))
+  emit('change-device', item)
+}
+// 监听音量变化，如果currentDevice的did不为空，则要同步发送请求
+watch(() => volume.value, (value) => {
+  if (currentDevice.value.did) {
+    console.log('%csrc\components\Player.vue:186 value', 'color: #007acc;', value);
+    const { data: deviceVolume } = useFetch(ApiList.setVolume).post({
+      did: currentDevice.value.did,
+      volume: value*100
+    }).json()
+  }
+})
+//投放到小爱设备的音乐需要立即更新进度条
+setInterval(() => {
+  if (currentDevice.value.did) {
+    const { data: res } = useFetch(ApiList.playingMusic + currentDevice.value.did).get().json()
+    watch(() => res.value, (value) => {
+      if(res.value.ret=="OK"&&res.value.is_playing){
+        currentTime.value = res.value.offset * duration.value / 100
+      }
+    },{once:true})
+  }
+}, 1000)
+
+const setTimer = (item) => {
+  if (currentDevice.value.did) {
+    const { data: res } = useFetch(ApiList.sendCmd).post({
+      did: currentDevice.value.did,
+      cmd: item+"后关机"
+    }).json()
+  }
+}
 // 监听音频元数据加载完成
 const onLoadedMetadata = (event) => {
   // const audio = event.target;
   // console.log('%csrc\components\Player.vue:80 event', 'color: #007acc;', event);
   duration.value = event.target.duration;
   audio.value?.play().catch((err) => {
-    console.log('%csrc\components\Player.vue:116 err,playState', 'color: #007acc;', err, playState);
+    // console.log('%csrc\components\Player.vue:116 err,playState', 'color: #007acc;', err, playState);
     playState.value = true;
   });
   // console.log('%csrc\components\Player.vue:119 currentTrack.value.cover', 'color: #007acc;', currentTrack.value.cover);
@@ -130,8 +238,22 @@ const onLoadedMetadata = (event) => {
 };
 // 播放、暂停
 const togglePlay = () => {
-  playState.value ? audio.value?.play() : audio.value?.pause();
   playState.value = !playState.value;
+  //如果currentDevice的did不为空，则应该在小爱设备上进行播放
+  if (currentDevice.value.did) {
+    if( playState.value===true){
+      useFetch(ApiList.sendCmd).post({
+        did: currentDevice.value.did,
+        cmd: '关机'
+      })
+      return;
+    }
+    // playState.value = !playState.value;
+    emit('handle-play', currentTrack.value.name)
+    return;
+  }
+  playState.value ? audio.value.play() : audio.value.pause();
+  // playState.value = !playState.value;
 };
 // 上一首
 const prevTrack = async () => {
@@ -202,7 +324,6 @@ const formatTime = (seconds) => {
 // 解析歌词
 const currentLyric = computed(() => {
   // const obj = currentTrack.value;
-  console.log('%csrc\components\Player.vue:185 currentTrack.value', 'color: #007acc;', currentTrack.value);
   return currentTrack.value.lyric ? parseLyrics(currentTrack.value.lyric) : [];
 });
 
@@ -288,15 +409,95 @@ watchEffect(() => {
 </script>
 
 <style scoped lang="scss">
+.wordType {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: break-all;
+}
+
 .music_player_wrapper {
   display: flex;
   flex-direction: column-reverse;
+  background: #fff;
+  box-sizing: border-box;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  justify-content: space-between;
+  bottom: 0;
+  z-index: 99;
+  position: -webkit-sticky;
+  position: fixed;
+  color: #262338;
+  width: 100vw;
   --lh: 8.467vw;
+  --fz: 5.333vw;
 
   .music_player_box {
     background-color: white;
     width: 100vw;
     --size: clamp(50px, 20vw, 100px);
+  }
+
+  .music_info {
+    font-size: var(--fz);
+    width: 90vw;
+    height: 20vw;
+
+    .music_name {
+      display: flex;
+      font-weight: bold;
+      justify-content: space-between;
+
+      svg {
+        width: 6vw;
+        height: 6vw;
+
+      }
+    }
+
+    .music_singer {
+      font-size: calc(var(--fz) * 0.7);
+      font-weight: normal;
+      color: #a2a9af;
+    }
+  }
+
+  .device_setting {
+    display: flex;
+    width: 90vw;
+    justify-content: end;
+    margin-bottom: 2vh;
+    gap: 4vw;
+    .current_device_name {
+      font-size: calc(var(--fz) * 0.8);
+      font-weight: normal;
+    }
+    .shutdown {
+      margin-left: auto;
+    }
+  }
+
+  .poper {
+    position: fixed;
+    z-index: 99;
+    width: 90vw;
+    background-color: #f9f8fd;
+    text-align: center;
+    padding: 5vw;
+    font-weight: normal;
+    font-size: calc(var(--fz) * 0.6);
+    border-radius: 5vw;
+    backdrop-filter: blur(50px);
+    cursor: default;
+    bottom: 0;
+    height: 30vw;
+
+    .device {
+      border-bottom: 1px solid #DFE2DB;
+    }
   }
 
   .controls {
@@ -314,7 +515,7 @@ watchEffect(() => {
     }
   }
 
-  .progress-bar {
+  .progress_bar {
     display: flex;
     justify-content: center;
     align-content: center;
@@ -365,7 +566,9 @@ watchEffect(() => {
     user-select: none;
     font-size: 4.333vw;
     line-height: var(--lh);
-    font-weight: bold;
+    font-weight: normal;
+    height: 20vh;
+    overflow: hidden;
   }
 
   .lyrics-container:active {
@@ -379,20 +582,20 @@ watchEffect(() => {
 
   .lyrics>div {
     text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    word-break: break-all;
     width: 96vw;
-    margin: 0 auto;
     padding: 0 2vw;
+  }
+
+  .lyrics_none {
+    display: flex;
+    justify-content: center;
   }
 
   .current {
     color: red;
   }
 
-  .time-display {
+  .time_display {
     display: flex;
     justify-content: space-between;
     width: 80vw;
@@ -403,10 +606,23 @@ watchEffect(() => {
     position: fixed;
     right: 0;
     top: 50%;
-    z-index: 999;
+    z-index: 99;
     transform: translateX(40%) translateY(-50%) rotate(-90deg);
   }
 
+  .cover_wrapper {
+    height: 50vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4vw;
+
+    .cover {
+      width: 80vw;
+      height: 80vw;
+      border-radius: 4vw;
+    }
+  }
 }
 
 .mini {
@@ -424,10 +640,11 @@ watchEffect(() => {
 }
 
 .full {
-  height: 100vh;
+  top: 0;
+  overflow: hidden;
 
   .music_player_box {
-    height: 30vh;
+    height: 28vh;
   }
 
   .lyrics-container {
@@ -448,18 +665,7 @@ watchEffect(() => {
     }
   }
 
-  .cover_wrapper {
-    height: 50vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 
-    .cover {
-      width: 40vh;
-      height: 40vh;
-      border-radius: 4vw;
-    }
-  }
 }
 
 .rotate {

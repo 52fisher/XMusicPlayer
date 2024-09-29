@@ -8,8 +8,8 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ApiList: typeof import('./components/ApiList.vue')['default']
-    AudioPlayer: typeof import('./components/AudioPlayer.vue')['default']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
+    IconDevice: typeof import('./components/icons/IconDevice.vue')['default']
     IconGrid: typeof import('./components/icons/IconGrid.vue')['default']
     IconHome: typeof import('./components/icons/IconHome.vue')['default']
     IconList: typeof import('./components/icons/IconList.vue')['default']
@@ -22,6 +22,9 @@ declare module 'vue' {
     IconRepeatAll: typeof import('./components/icons/IconRepeatAll.vue')['default']
     IconRepeatOne: typeof import('./components/icons/IconRepeatOne.vue')['default']
     IconShrink: typeof import('./components/icons/IconShrink.vue')['default']
+    IconStar: typeof import('./components/icons/IconStar.vue')['default']
+    IconTimer: typeof import('./components/icons/IconTimer.vue')['default']
+    ModalDialog: typeof import('./components/ModalDialog.vue')['default']
     Player: typeof import('./components/player.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
