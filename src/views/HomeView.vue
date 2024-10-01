@@ -58,13 +58,15 @@ watch(() => setting.value, () => {
   let devices = Object.keys(setting.value.devices).map(item => {
     return {
       name: setting.value.devices[item]['name'],
-      did: setting.value.devices[item]['did']
+      did: setting.value.devices[item]['did'],
+      play_type: setting.value.devices[item]['play_type']||0
     }
   })
   //  console.log('%csrc\views\HomeView.vue:61 devices', 'color: #007acc;', devices);
   devices.push({
     name: '本地',
-    did: ''
+    did: '',
+    play_type: 0
   })
   localforage.setItem('devices', devices)
 }, { once: true })
@@ -131,7 +133,7 @@ watch(() => setting.value, () => {
     align-content: center;
 
     .music_list_item {
-      --size: clamp(6em, 5vw, 8em);
+      --size: clamp(8em, 10vw, 10em);
       width: var(--size);
       height: var(--size);
       line-height: var(--size);

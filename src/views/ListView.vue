@@ -35,7 +35,8 @@
 
             <player :currentTrack="currentTrack" @next-track="nextTrack" @prev-track="prevTrack"
                 @random-track="randomTrack" :isMiniPlayer="miniToggle" @toggle-mini-player="miniToggle = !miniToggle"
-                ref="xplayer" @handle-play="handlePlay" @change-device="changeDevice">
+                ref="xplayer" @handle-play="handlePlay" @change-device="changeDevice"
+                @update:currentTrack="updateCurrentTrack">
 
             </player>
         </div>
@@ -50,6 +51,7 @@ import IconPlay from '../components/icons/IconPlay.vue'
 import IconHome from '../components/icons/IconHome.vue';
 import { useIntersectionObserver } from '@vueuse/core'
 import ApiList from '../components/ApiList.vue'
+import cover from '/defaultcover.jpg'
 // import AudioPlayer from 'vue3-audio-player'
 // import 'vue3-audio-player/dist/style.css'
 import player from '../components/player.vue'
@@ -72,7 +74,13 @@ localforage.getItem('currentDevice').then((value) => {
 })
 //音乐组件是否最小化
 const miniToggle = ref(true) //true最小化
-const currentTrack = ref({})
+const currentTrack = ref({
+    name: '',
+    url: '',
+    album: '',
+    lyric: "",
+    cover: cover,
+})
 const xplayer = ref(null)
 const { isSwiping, direction } = useSwipe(xplayer);
 watchEffect(() => {
@@ -88,7 +96,7 @@ const handleLazyImage = (target) => {
         if (!data.value) return
 
         //检查data是否有tags，有就拿到tags，没有就拿到默认图片
-        data.value.tags.picture && (img.src = data.value.tags.picture?.replace('/cache/picture_cache', ""));
+        data.value.tags.picture && (img.src = data.value.tags.picture);
         //如果为空则不要填写
         span.innerText = [data.value.tags.artist, data.value.tags.album, data.value.tags.title].filter(Boolean).join('-');
         //把以上标签信息存到img对应名字的的dataset中
@@ -99,9 +107,25 @@ const handleLazyImage = (target) => {
         // img.dataset.url = data.value.url
     })
 }
+const updateCurrentTrack = (name, remote = false) => {
+    let { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
+    watch(() => data.value, (value) => {
+        if (!data.value) return
+        currentTrack.value = {
+            name: data.value.name,
+            url: remote ? "" : data.value.url,
+            album: data.value.tags.album,
+            cover: data.value.tags.picture || cover,
+            lyric: data.value.tags.lyrics,
+            singer: data.value.tags.artist,
+        }
+        //保存currentTrack
+        localforage.setItem('currentTrack', toRaw(currentTrack.value))
+    })
+}
 const handlePlay = (name) => {
     //如果currentDevice的did不为空，则应该在小爱设备上进行播放
-    console.log('%csrc\views\ListView.vue:104 currentDevice', 'color: #007acc;', currentDevice);
+    // console.log('%csrc\views\ListView.vue:104 currentDevice', 'color: #007acc;', currentDevice);
     if (currentDevice.value.did) {
         const { data: res } = useFetch(ApiList.sendCmd).post({
             did: currentDevice.value.did,
@@ -111,40 +135,22 @@ const handlePlay = (name) => {
             if (!value) return
             res.ret == "OK" //后面再执行逻辑
         })
-        let { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
-        watch(() => data.value, (value) => {
-            if (!data.value) return
-            currentTrack.value = {
-                name: data.value.name,
-                url: '',
-                album: data.value.tags.album,
-                cover: data.value.tags.picture,
-                lyric: data.value.tags.lyrics,
-                singer: data.value.tags.artist,
-            }
-            //保存currentTrack
-            localforage.setItem('currentTrack', toRaw(currentTrack.value))
-        })
+        updateCurrentTrack(name, true)
         return;
     }
-    let { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
-    watch(() => data.value, (value) => {
-        if (!data.value) return
-        currentTrack.value = {
-            name: data.value.name,
-            url: data.value.url,
-            album: data.value.tags.album,
-            cover: data.value.tags.picture,
-            lyric: data.value.tags.lyrics,
-            singer: data.value.tags.artist,
-        }
-        //保存currentTrack
-        localforage.setItem('currentTrack', toRaw(currentTrack.value))
-    })
+    updateCurrentTrack(name)
     // localforage.setItem('currentTrack', toRaw(currentTrack.value))
 }
 const nextTrack = () => {
     // console.log('%csrc\views\ListView.vue:111 list.value', 'color: #007acc;', list.value);
+    //currentDevice的did不为空，则说明是小爱设备，应该发送cmd命令控制上一首或下一首
+    if (currentDevice.value.did) {
+        fetchData(ApiList.sendCmd, {
+            did: currentDevice.value.did,
+            cmd: '下一首'
+        })
+        return;
+    }
     let index = list.value.indexOf(currentTrack.value.name)
     if (index === list.value.length - 1) {
         index = 0
@@ -154,7 +160,13 @@ const nextTrack = () => {
     handlePlay(list.value[index])
 }
 const prevTrack = () => {
-    // console.log('%csrc\views\ListView.vue:111 list.value', 'color: #007acc;', list.value);
+    if (currentDevice.value.did) {
+        fetchData(ApiList.sendCmd, {
+            did: currentDevice.value.did,
+            cmd: '上一首'
+        })
+        return;
+    }
     let index = list.value.indexOf(currentTrack.value.name)
     if (index === 0) {
         index = list.value.length - 1
@@ -182,10 +194,26 @@ onMounted(() => {
     })
     //加载currentTrack
     localforage.getItem('currentTrack').then((value) => {
-        currentTrack.value = value
+        if (value) {
+            currentTrack.value = value
+        }
     })
 })
 // console.log('%csrc\views\ListView.vue:48 listRefs', 'color: #007acc;', listRefs);
+const fetchData = (url, postData = "", callback) => {
+  fetch(url, postData ? {
+    method: 'POST',
+    body: JSON.stringify(postData),
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  } : {
+    method: 'GET',
+  }
+  ).then(res => res.json()).then(res => {
+    callback && callback(res)
+  })
+}
 </script>
 <style scoped lang="scss">
 /* 导入本地字体*/

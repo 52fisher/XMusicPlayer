@@ -13,22 +13,22 @@
           <ModalDialog @close="timerSwitch = false" v-if="timerSwitch">
             <template #title>选择定时关闭的时间</template>
             <template #content>
-              <div v-for="item in ['10分钟',  '30分钟', '60分钟']" :key="item" @click="setTimer(item)">
-                  {{ item }}
+              <div v-for="item in ['10分钟', '30分钟', '60分钟']" :key="item" @click="setTimer(item)">
+                {{ item }}
               </div>
             </template>
           </ModalDialog>
         </div>
         <div class="cast_device" @click="devicesSwitch = true">
-            <IconDevice />
-            <ModalDialog @close="devicesSwitch = false" v-if="devicesSwitch">
-              <template #title>选择投放设备</template>
-              <template #content>
-                <div v-for="item in devices" :key="item.name" @click="changeDevice(item)">
-                    {{ item.name }}
-                </div>
-              </template>
-            </ModalDialog>
+          <IconDevice />
+          <ModalDialog @close="devicesSwitch = false" v-if="devicesSwitch">
+            <template #title>选择投放设备</template>
+            <template #content>
+              <div v-for="item in devices" :key="item.name" @click="changeDevice(item)">
+                {{ item.name }}
+              </div>
+            </template>
+          </ModalDialog>
         </div>
 
       </div>
@@ -53,10 +53,10 @@
           <IconMusicPrev @click="prevTrack" />
         </div>
         <div class="audio_state" @click="togglePlay">
-          <img src="/cover.png" alt="" ref="audioState" class="cover">
+          <img :src="currentTrack.cover" alt="" ref="audioState" class="cover">
           <div class="audio_state_icon">
-            <IconMusicPlay v-if="playState" />
-            <IconMusicPause v-else />
+            <IconMusicPause v-if="playState" />
+            <IconMusicPlay v-else />
           </div>
         </div>
         <div class="next">
@@ -90,18 +90,18 @@
     </div>
     <!-- 封面 -->
     <div class="cover_wrapper" v-if="!isMiniPlayer">
-      <img src="/defaultcover.jpg" alt="" class="cover" ref="fullCover">
+      <img :src="currentTrack.cover" alt="" class="cover">
     </div>
     <!-- 音量调整 -->
     <div class="volume" v-if="!isMiniPlayer">
-      <input type="range" min="0" max="1" step="0.01" v-model="volume" @input="changeVolume" />
+      <input type="range" min="0" max="1" step="0.01" v-model="volume" @change="changeVolume" />
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useFetch, useStorage } from '@vueuse/core'
+import { useFetch, useStorage, watchDebounced } from '@vueuse/core'
 import IconMusicPlay from './icons/IconMusicPlay.vue'
 import IconMusicPause from './icons/IconMusicPause.vue'
 import IconMusicNext from './icons/IconMusicNext.vue'
@@ -116,8 +116,9 @@ import IconTimer from './icons/IconTimer.vue'
 import localforage from 'localforage'
 import ModalDialog from './ModalDialog.vue'
 import ApiList from './ApiList.vue'
-const emit = defineEmits(['prev-track', 'next-track', 'random-track','handle-play','change-device'])
-const playState = ref(false);
+
+const emit = defineEmits(['prev-track', 'next-track', 'random-track', 'handle-play', 'change-device', 'update:currentTrack'])
+const playState = ref(false); //true为播放 显示暂停按钮，false为暂停 显示为播放按钮
 const volume = ref(0.5);
 // const loopType = ref('sequence');
 const currentTime = ref(0);
@@ -127,7 +128,7 @@ const audioState = ref() // 封面播放组件
 const fullCover = ref() // 组件最大化后的 全屏封面
 //循环播放
 const loopType = ref(useStorage('loopType', 0));
-const loopList = ['单曲循环', '列表循环', '随机播放'];
+const loopList = ['单曲循环', '全部循环', '随机播放'];
 // 滚动偏移量
 const lyricOffset = ref(0);
 
@@ -138,27 +139,35 @@ const currentTrack = computed(() => props.currentTrack);
 const devices = ref([]);
 const devicesSwitch = ref(false)
 const timerSwitch = ref(false)
-const currentDevice = ref({name:"本机",did:""});
-localforage.getItem('devices').then((value) => {
-  if (value) {
-    devices.value = value
-  }
-})
-localforage.getItem('currentDevice').then((value) => {
-  if (value) {
-    currentDevice.value = value
-  }
-})
+const currentDevice = ref({ name: "本机", did: "" , play_type:0});
+const synctimer = ref(null)
+//localforage是异步的，所以在组件运行前必须init
+const init = () => {
+  localforage.getItem('devices').then((value) => {
+    if (value) {
+      devices.value = value
+    }
+  })
+  localforage.getItem('currentDevice').then((value) => {
+    if (value) {
+      currentDevice.value = value
+      //如果保存的设备为远程设备，则载入数据时应该立即开启定时器
+      if (value.did) {
+        syncRemoteMusicInfo()
+        synctimer.value = setInterval(syncRemoteMusicInfo, 1000)
+      }
+    }
+  })
+  localforage.getItem('volume').then((value) => {
+    if (value) {
+      volume.value = value
+    }
+  })
+}
+init()
 const props = defineProps({
   currentTrack: {
-    type: Object,
-    default: () => ({
-      name: '',
-      url: '',
-      album: '',
-      lyric: "",
-      cover: '',
-    }),
+    type: Object
   }, isMiniPlayer: {
     type: Boolean,
     default: true
@@ -168,6 +177,15 @@ const props = defineProps({
 //切换循环模式
 const toggleLoopType = () => {
   loopType.value = (loopType.value + 1) % loopList.length;
+  //如果currentDevice的did不为空，则需要发送cmd请求，更改循环模式
+  if (currentDevice.value.did) {
+    fetchData(ApiList.sendCmd, {
+      did: currentDevice.value.did,
+      cmd: loopList[loopType.value]
+    }, (res) => {
+      console.log('%csrc\components\Player.vue:102 更改循环模式', 'color: #007acc;', res);
+    })
+  }
 }
 const toggleMiniPlayer = () => {
   emit('toggle-mini-player')
@@ -176,56 +194,82 @@ const toggleMiniPlayer = () => {
 const changeDevice = (item) => {
   //更更换设备应该立即暂停音乐
   console.log('%csrc\components\Player.vue:169 playState.value', 'color: #007acc;', playState.value);
-  if (playState.value!==true) {
-    audio.value.pause()
+  // if (playState.value !== true) {
+  //   audio.value.pause()
+  // }
+  //如果设备的did不为空，说明是本地 应该暂停音乐
+  if (!currentDevice.value.did) {
+    audio.value?.pause()
+    playState.value = false
   }
   devicesSwitch.value = false
   currentDevice.value = item
+  if (!item.did) {
+    //切换设备后如果是设备选择为本地，应该重新拉取音乐信息（remote的url为空）,注意清除定时器
+    synctimer.value && clearInterval(synctimer.value)
+    emit('update:currentTrack', currentTrack.value.name)
+  }
   // console.log('%csrc\components\Player.vue:169 item', 'color: #007acc;', item);
   //若更改的设备不是本地(did为空)，则要立即通过ApiList拉取音量
   if (item.did) {
-    const { data: deviceVolume } = useFetch(ApiList.getVolume + item.did).get().json()
-    watch(() => volume.value, (value) => {
-      volume.value = parseInt(deviceVolume.value) / 100;
-    },{once:true})
+    //切换设备后获取正在播放的歌曲信息
+    fetchData(ApiList.getVolume + item.did, '', (res) => {
+      volume.value = parseInt(res.volume) / 100;
+    })
+    //循环模式也要切换为当前设备的循环模式
+    loopType.value = item.play_type
+    //同时要开启同步歌曲信息的定时器，本地播放音乐不需要重复发起请求
+    synctimer.value && clearInterval(synctimer.value)
+    syncRemoteMusicInfo()
+    synctimer.value = setInterval(syncRemoteMusicInfo, 1000)
   }
-  
+
   localforage.setItem('currentDevice', toRaw(item))
   emit('change-device', item)
 }
-// 监听音量变化，如果currentDevice的did不为空，则要同步发送请求
-watch(() => volume.value, (value) => {
-  if (currentDevice.value.did) {
-    console.log('%csrc\components\Player.vue:186 value', 'color: #007acc;', value);
-    const { data: deviceVolume } = useFetch(ApiList.setVolume).post({
-      did: currentDevice.value.did,
-      volume: value*100
-    }).json()
-  }
-})
 //投放到小爱设备的音乐需要立即更新进度条
-setInterval(() => {
-  if (currentDevice.value.did) {
-    const { data: res } = useFetch(ApiList.playingMusic + currentDevice.value.did).get().json()
-    watch(() => res.value, (value) => {
-      if (res.value.ret == "OK" && res.value.is_playing) {
-        duration.value = res.value.duration
-        currentTime.value = res.value.offset * duration.value / 100
-        updateLyricOffset();
-      }
-    },{once:true})
+//同步歌词和进度条，首次立即执行，每隔1秒检测一次
+const syncRemoteMusicInfo = () => {
+  if (!currentDevice.value.did) {
+    return;
   }
-}, 1000)
+  fetchData(ApiList.playingMusic + currentDevice.value.did, '', (res) => {
+    if (res.ret != "OK") {
+      throw new Error("获取播放信息失败");
+      return;
+    }
+    //如果歌曲名和res.cur_music不同，则立即获取歌曲信息
+    if (res.cur_music && (currentTrack.value.name != res.cur_music)) {
+      emit('update:currentTrack', res.cur_music, true)
+    }
+    //如果正在播放，则同步歌词和进度
+    if (res.is_playing) {
+      //图标也要同步
+      playState.value = true
+      //同步远程信息，开启定时器
+      duration.value = res.duration
+      currentTime.value = res.offset
+      updateLyricOffset();
+      return;
+    }
+    //没有播放就清空定时器并暂停播放
+    synctimer.value && clearInterval(synctimer.value)
+    playState.value = false
+  })
+}
+
 
 const setTimer = (item) => {
   if (currentDevice.value.did) {
     const { data: res } = useFetch(ApiList.sendCmd).post({
       did: currentDevice.value.did,
-      cmd: item+"后关机"
+      cmd: item + "后关机"
     }).json()
   }
 }
-watch(()=>currentTrack.value.cover,(value)=>{
+//监听currentTrack的变化，更新播放组件的封面
+watch(() => currentTrack.value.cover, (value) => {
+  console.log('%csrc\components\Player.vue:259 cover发生变化了', 'color: #007acc;', value);
   audioState.value.src = value
 })
 // 监听音频元数据加载完成
@@ -243,26 +287,34 @@ const onLoadedMetadata = (event) => {
 };
 // 播放、暂停
 const togglePlay = () => {
-  playState.value = !playState.value;
-  //如果currentDevice的did不为空，则应该在小爱设备上进行播放
-  if (currentDevice.value.did) {
-    if( playState.value===true){
-      useFetch(ApiList.sendCmd).post({
-        did: currentDevice.value.did,
-        cmd: '关机'
-      })
-      return;
-    }
-    // playState.value = !playState.value;
-    emit('handle-play', currentTrack.value.name)
+  console.log('%csrc\components\Player.vue:275 playState.value', 'color: #007acc;', playState.value);
+  //本地播放直接操作playState即可
+  if (!currentDevice.value.did) {
+    //play()和pause()已经通过watch绑定到playState.value上了直接切换即可
+    playState.value = !playState.value;
     return;
   }
-  playState.value ? audio.value.play() : audio.value.pause();
   // playState.value = !playState.value;
+  //如果currentDevice的did不为空，则应该在小爱设备上进行播放
+  //若当前为播放状态，点击按钮后切换为暂停状态
+  if (playState.value === true) {
+    fetchData(ApiList.sendCmd, {
+      did: currentDevice.value.did,
+      cmd: '关机'
+    })
+    playState.value = false;
+    //暂停后应该停止定时器
+    synctimer.value && clearInterval(synctimer.value)
+    return;
+  }
+  //remote设备的暂停其实是关机命令，所以playState.value为false时要重新播放
+  emit('handle-play', currentTrack.value.name)
+  
+  playState.value = true;
 };
 // 上一首
 const prevTrack = async () => {
-  audio.value.pause(); // 切换前先暂停
+  !currentDevice.value.did && (playState.value = false); // 切换前先暂停
   if (loopType.value === 2) {
     emit('random-track');
     return;
@@ -273,8 +325,7 @@ const prevTrack = async () => {
 };
 // 下一首
 const nextTrack = async () => {
-
-  audio.value.pause(); // 切换前先暂停
+  !currentDevice.value.did && (playState.value = false); // 切换前先暂停
   //loopType如果为2，则表示随机播放,抛出随机random-track
   if (loopType.value === 2) {
     emit('random-track');
@@ -295,12 +346,25 @@ const playCurrentTrack = async () => {
 };
 // 监听当前歌曲的播放进度
 const updateCurrentTime = (event) => {
+  //remote的音乐无法选择播放进度
+  if (currentDevice.value.did) return
   currentTime.value = event.target.currentTime;
   updateLyricOffset(); // 根据播放进度更新歌词滚动
 };
 // 调节音量
 const changeVolume = () => {
-  audio.value.volume = volume.value;
+  debounce(() => {
+    audio.value.volume = volume.value;
+    if (currentDevice.value.did) {
+      //用fetchData改写
+      fetchData(ApiList.setVolume, {
+        did: currentDevice.value.did,
+        volume: volume.value * 100
+      })
+    }
+    //保存到本地
+    localforage.setItem('volume', volume.value);
+  }, 500)();
 };
 // 监听歌曲播放结束
 const handleTrackEnd = () => {
@@ -395,23 +459,52 @@ const isCurrentLine = (index) => {
 //使用autoplay时playState变得不可靠，自动更新状态存在问题，必须在挂载完成后,监听audio的播放状态,修正状态
 onMounted(() => {
   audio.value.addEventListener('playing', () => {
-    playState.value = false;
+    playState.value = true;
     audioState?.value?.classList.add('rotate')
   })
   audio.value.addEventListener('pause', () => {
-    playState.value = true;
+    playState.value = false;
     audioState?.value?.classList.remove('rotate')
   })
 })
-watchEffect(() => {
-  if (props.isMiniPlayer === true) {
+watch(() => playState.value, (value) => {
+  if (value) {
+    audioState?.value?.classList.add('rotate')
+    // console.log('%csrc\components\Player.vue:465 audio.value', 'color: #007acc;', audio.value);
+    !currentDevice.value.did && audio.value?.play();
     return;
   }
-  if (fullCover.value) {
-    currentTrack.value.cover && (fullCover.value.src = currentTrack.value.cover);
-  }
+  audioState.value?.classList.remove('rotate')
+
+  !currentDevice.value.did && audio.value?.pause();
 })
 
+const fetchData = (url, postData = "", callback) => {
+  fetch(url, postData ? {
+    method: 'POST',
+    body: JSON.stringify(postData),
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  } : {
+    method: 'GET',
+  }
+  ).then(res => res.json()).then(res => {
+    callback && callback(res)
+  })
+}
+//debounce
+const debounce = (fn, delay = 500) => {
+  let timer = null
+  return function (...args) {
+    if (timer) {
+      clearTimeout(timer)
+    }
+    timer = setTimeout(() => {
+      fn.apply(this, args)
+    }, delay)
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -477,10 +570,12 @@ watchEffect(() => {
     justify-content: end;
     margin-bottom: 2vh;
     gap: 4vw;
+
     .current_device_name {
       font-size: calc(var(--fz) * 0.8);
       font-weight: normal;
     }
+
     .shutdown {
       margin-left: auto;
     }

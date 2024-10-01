@@ -7,8 +7,7 @@ import { RouterLink, RouterView } from 'vue-router'
 </template>
 
 <style lang="scss">
-#app{
-  background-color: rgba(0,0,0,0.05);
+body{
+  background-color: rgba(0, 0, 0, 0.05);
 }
-
 </style>
