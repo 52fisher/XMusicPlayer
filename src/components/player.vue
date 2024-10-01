@@ -101,7 +101,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useFetch, useStorage, watchDebounced } from '@vueuse/core'
+import { useFetch, useStorage } from '@vueuse/core'
 import IconMusicPlay from './icons/IconMusicPlay.vue'
 import IconMusicPause from './icons/IconMusicPause.vue'
 import IconMusicNext from './icons/IconMusicNext.vue'
@@ -125,7 +125,7 @@ const currentTime = ref(0);
 const duration = ref(0); // 歌曲总时长
 const audio = ref()
 const audioState = ref() // 封面播放组件
-const fullCover = ref() // 组件最大化后的 全屏封面
+
 //循环播放
 const loopType = ref(useStorage('loopType', 0));
 const loopList = ['单曲循环', '全部循环', '随机播放'];
