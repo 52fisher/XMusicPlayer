@@ -11,7 +11,7 @@
         <div class="list">
             <div class="listhead">
                 <div class="listheadleft">共{{ total }}首歌曲</div>
-                <div class="listheadright">
+                <div class="listheadright" @click="handlePlayAll">
                     <IconPlay /> 播放全部
                 </div>
             </div>
@@ -34,8 +34,7 @@
             </div>
 
             <player :currentTrack="currentTrack" @next-track="nextTrack" @prev-track="prevTrack"
-                @random-track="randomTrack" :isMiniPlayer="miniToggle" @toggle-mini-player="miniToggle = !miniToggle"
-                ref="xplayer" @handle-play="handlePlay" @change-device="changeDevice"
+                @random-track="randomTrack" @handle-play="handlePlay" @change-device="changeDevice"
                 @update:currentTrack="updateCurrentTrack">
 
             </player>
@@ -52,9 +51,10 @@ import IconHome from '../components/icons/IconHome.vue';
 import { useIntersectionObserver } from '@vueuse/core'
 import ApiList from '../components/ApiList.vue'
 import cover from '/defaultcover.jpg'
-// import AudioPlayer from 'vue3-audio-player'
-// import 'vue3-audio-player/dist/style.css'
 import player from '../components/player.vue'
+import { layer } from "vue3-layer";
+
+
 const route = useRoute()
 //分类标题
 const title = route.params.title
@@ -72,8 +72,6 @@ localforage.getItem('currentDevice').then((value) => {
         currentDevice.value = value
     }
 })
-//音乐组件是否最小化
-const miniToggle = ref(true) //true最小化
 const currentTrack = ref({
     name: '',
     url: '',
@@ -81,17 +79,23 @@ const currentTrack = ref({
     lyric: "",
     cover: cover,
 })
-const xplayer = ref(null)
-const { isSwiping, direction } = useSwipe(xplayer);
-watchEffect(() => {
-    direction.value === 'down' && (miniToggle.value = true)
-    direction.value === 'up' && (miniToggle.value = false)
-})
+/**
+ * @description: Lazy load images and fetch music info
+ * @param {HTMLElement} target The element that contains the image
+ */
 const handleLazyImage = (target) => {
     const img = target.querySelector('img')
     const span = target.querySelector('.wordBody_body span')
     const name = img.dataset.name
+
+    /**
+     * Fetch music info from the API
+     */
     const { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
+
+    /**
+     * Watch the data and update the image and span text when it changes
+     */
     watchEffect(() => {
         if (!data.value) return
 
@@ -99,38 +103,97 @@ const handleLazyImage = (target) => {
         data.value.tags.picture && (img.src = data.value.tags.picture);
         //如果为空则不要填写
         span.innerText = [data.value.tags.artist, data.value.tags.album, data.value.tags.title].filter(Boolean).join('-');
-        //把以上标签信息存到img对应名字的的dataset中
-        // img.dataset.name = data.value.tags.title
-        // img.dataset.artist = data.value.tags.artist
-        // img.dataset.album = data.value.tags.album
-        // img.dataset.lyric = data.value.tags.lyric
-        // img.dataset.url = data.value.url
     })
 }
+
+/**
+ * @description: Update the current track info
+ * @param {string} name The name of the music
+ * @param {boolean} remote Whether the music is remote or not
+ */
 const updateCurrentTrack = (name, remote = false) => {
     let { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
+    /**
+     * Watch the data and update the current track info when it changes
+     */
     watch(() => data.value, (value) => {
         if (!data.value) return
         currentTrack.value = {
+            /**
+             * @description: The name of the music
+             */
             name: data.value.name,
+            /**
+             * @description: The url of the music
+             * @type {string}
+             */
             url: remote ? "" : data.value.url,
+            /**
+             * @description: The album of the music
+             * @type {string}
+             */
             album: data.value.tags.album,
+            /**
+             * @description: The cover of the music
+             * @type {string}
+             */
             cover: data.value.tags.picture || cover,
+            /**
+             * @description: The lyrics of the music
+             * @type {string}
+             */
             lyric: data.value.tags.lyrics,
+            /**
+             * @description: The singer of the music
+             * @type {string}
+             */
             singer: data.value.tags.artist,
         }
-        //保存currentTrack
+        // Save the current track to local storage
         localforage.setItem('currentTrack', toRaw(currentTrack.value))
     })
 }
-const handlePlay = (name) => {
-    //如果currentDevice的did不为空，则应该在小爱设备上进行播放
-    // console.log('%csrc\views\ListView.vue:104 currentDevice', 'color: #007acc;', currentDevice);
+/**
+ * @description: Handle play all button click
+ * If the list is empty, show a message to the user
+ * If the current device is a remote device, send the cmd to the backend
+ * If the current device is a local device, play the first song in the list
+ */
+const handlePlayAll = () => {
+    // If the list is empty, show a message to the user
+    if (list.value.length == 0) {
+        layer.msg(' ', ' ')
+        return;
+    }
+    // If the current device is a remote device, send the cmd to the backend
     if (currentDevice.value.did) {
+        // Use fetchData to send the request
+        fetchData(ApiList.sendCmd, {
+            did: currentDevice.value.did,
+            cmd: ` ${title}`
+        }, (res) => {
+            res.ret == "OK" && layer.msg(` ${currentDevice.value.name}  ${title} `, ' ')
+        })
+        return;
+    }
+    // If the current device is a local device, play the first song in the list
+    handlePlay(list.value[0])
+}
+/**
+ * @description: Handle play button click
+ * @param {string} name The name of the music to play
+ */
+const handlePlay = (name) => {
+    // If the current device is a remote device, send the cmd to the backend
+    if (currentDevice.value.did) {
+        // Use fetchData to send the request
         const { data: res } = useFetch(ApiList.sendCmd).post({
             did: currentDevice.value.did,
-            cmd: '播放列表' + title + "|" + name
+            cmd: ' ' + title + "|" + name
         }).json()
+        /**
+         * Watch the response and update the current track info when it changes
+         */
         watch(() => res.value, (value) => {
             if (!value) return
             res.ret == "OK" //后面再执行逻辑
@@ -138,6 +201,7 @@ const handlePlay = (name) => {
         updateCurrentTrack(name, true)
         return;
     }
+    // If the current device is a local device, play the first song in the list
     updateCurrentTrack(name)
     // localforage.setItem('currentTrack', toRaw(currentTrack.value))
 }
@@ -199,20 +263,26 @@ onMounted(() => {
         }
     })
 })
-// console.log('%csrc\views\ListView.vue:48 listRefs', 'color: #007acc;', listRefs);
-const fetchData = (url, postData = "", callback) => {
-  fetch(url, postData ? {
-    method: 'POST',
-    body: JSON.stringify(postData),
-    headers: {
-      'Content-Type': 'application/json',
+/**
+ * @description: 通过Fetch API来获取或发送数据
+ * @param {string} url  API的url
+ * @param {object} [postData={}]  POST请求时要传递的数据
+ * @param {function} [callback]  回调函数
+ * @return {void}
+ */
+const fetchData = (url, postData = {}, callback) => {
+    fetch(url, postData ? {
+        method: 'POST',
+        body: JSON.stringify(postData),
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    } : {
+        method: 'GET',
     }
-  } : {
-    method: 'GET',
-  }
-  ).then(res => res.json()).then(res => {
-    callback && callback(res)
-  })
+    ).then(res => res.json()).then(res => {
+        callback && callback(res)
+    })
 }
 </script>
 <style scoped lang="scss">
@@ -225,7 +295,7 @@ const fetchData = (url, postData = "", callback) => {
 }
 
 .container {
-    width: 100vw;
+    width: 100%;
     overflow: hidden;
     margin: 0 auto;
 
@@ -287,6 +357,7 @@ const fetchData = (url, postData = "", callback) => {
             .listheadright {
                 display: flex;
                 align-items: center;
+                cursor: default;
             }
         }
 
