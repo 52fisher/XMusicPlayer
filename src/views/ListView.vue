@@ -296,7 +296,6 @@ const fetchData = (url, postData = {}, callback) => {
 
 .container {
     width: 100%;
-    overflow: hidden;
     margin: 0 auto;
 
     .header {
@@ -477,7 +476,7 @@ const fetchData = (url, postData = {}, callback) => {
     display: flex;
     position: absolute;
     top: 20px;
-    z-index: 999;
+    z-index: 99;
     left: 10px;
 
     svg {
