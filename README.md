@@ -98,4 +98,4 @@ npm run dev
 
 ## 许可证
 
-本项目采用MIT许可证。有关详细信息，请查看LICENSE文件。
+本项目采用GPL V3许可证。有关详细信息，请查看LICENSE文件。
