@@ -2,9 +2,9 @@
 
 这是一个为xiaomusic写的一个移动端的播放器主题。
 
-![图片](https://github.com/user-attachments/assets/8c328c3b-ad78-4995-9dab-972a6f9b970a)
-![图片](https://github.com/user-attachments/assets/2ed8950a-0dbe-49e8-bd50-ed709cc1948a)
-![图片](https://github.com/user-attachments/assets/acd6117b-ad2b-4004-82cb-4b71d2727c0b)
+
+![图片](https://github.com/user-attachments/assets/2813023d-6821-4c89-b8f7-fcbe32341b2a) ![recording](https://github.com/user-attachments/assets/2dd27718-3070-42d5-b12c-8f4a42976f17) ![图片](https://github.com/user-attachments/assets/61b7bd24-2068-483f-96c9-eb1233aafa11) ![recording](https://github.com/user-attachments/assets/c394045f-ef05-4bbb-b74f-3e5985cd75f7)
+
 
 ## 项目结构
 
