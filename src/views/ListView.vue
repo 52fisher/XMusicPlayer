@@ -15,11 +15,10 @@
                     <IconPlay /> 播放全部
                 </div>
             </div>
-            <div class="listcontent">
-                <div class="singersMusicList" v-for="(item, index) in list" :key="index"
-                    :ref="el => { listRefs[index] = el }">
+            <div class="listcontent" v-infinite-scroll="loadRenderList" :infinite-scroll-disabled="disabled">
+                <div class="singersMusicList" v-for="(item, index) in renderList" :key="index" ref="listRefs">
                     <div class="order">{{ index + 1 }}</div>
-                    <div class="cover"><img src="/defaultcover.jpg" :data-name="item"></div>
+                    <div class="cover"><img :src="defaultcover" :data-name="item"></div>
                     <div class="wordBody">
                         <div class="musictitle">{{ item }}</div>
                         <div class="wordBody_body">
@@ -29,7 +28,6 @@
                     <div class="wordBody_butt">
                         <IconPlay @click="handlePlay(item)" />
                     </div>
-
                 </div>
             </div>
 
@@ -42,42 +40,54 @@
     </div>
 </template>
 <script setup>
-import localforage from 'localforage'
-import { RouterLink } from 'vue-router'
-import { useRoute } from 'vue-router'
-import { useStorage, useFetch, useSwipe } from '@vueuse/core'
-import IconPlay from '../components/icons/IconPlay.vue'
-import IconHome from '../components/icons/IconHome.vue';
+import { RouterLink, useRoute } from 'vue-router'
+import { useStorage } from '@vueuse/core'
+import IconPlay from '@/components/icons/IconPlay.vue'
+import IconHome from '@/components/icons/IconHome.vue';
 import { useIntersectionObserver } from '@vueuse/core'
-import ApiList from '../components/ApiList.vue'
+import ApiList from '@/components/ApiList.vue'
 import cover from '/defaultcover.jpg'
-import player from '../components/player.vue'
-import { layer } from "vue3-layer";
-
-
+import player from '@/components/player.vue'
+import fetchData from '@/components/FetchData.js'
+import defaultcover from '/defaultcover.jpg'
+import showMsg from '@/components/ModalMsg';
 const route = useRoute()
 //分类标题
 const title = route.params.title
 //歌曲清单
 const list = useStorage('list', [])
-const listRefs = [];
+const listRefs = ref([]);
+//渲染列表,渲染30首
+const renderList = ref(list.value.slice(0, 30))
+
 //歌曲总数
 const total = computed(() => {
     return list.value.length
 })
 //当前设备，默认本机
-const currentDevice = ref({ name: "本机", did: "" });
-localforage.getItem('currentDevice').then((value) => {
-    if (value) {
-        currentDevice.value = value
-    }
+// const currentDevice = ref({ name: "本机", did: "" });
+const currentDevice = useStorage('currentDevice', { name: "本机", did: "" })
+
+const currentTrack = useStorage('currentTrack', { name: '', url: '', album: '', lyric: "", cover: cover, })
+
+
+const loadRenderList = () => {
+    let index = renderList.value.length
+    renderList.value = list.value.slice(0, index + 30)
+}
+
+watch(listRefs.value, () => {
+    listRefs.value.slice(-30).forEach((item, index) => {
+        const { stop } = useIntersectionObserver(item, ([{ isIntersecting }]) => {
+            if (isIntersecting) {
+                stop()
+            }
+            handleLazyImage(item)
+        })
+    })
 })
-const currentTrack = ref({
-    name: '',
-    url: '',
-    album: '',
-    lyric: "",
-    cover: cover,
+const disabled = computed(() => {
+    return renderList.value.length >= total.value
 })
 /**
  * @description: Lazy load images and fetch music info
@@ -85,24 +95,20 @@ const currentTrack = ref({
  */
 const handleLazyImage = (target) => {
     const img = target.querySelector('img')
+    //判断img的src是否为defaultcover,不是就说明已经拿到了图片资源，直接返回
+    if (!img.src.includes(defaultcover)) {
+        return;
+    }
     const span = target.querySelector('.wordBody_body span')
     const name = img.dataset.name
 
-    /**
-     * Fetch music info from the API
-     */
-    const { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
+    fetchData(ApiList.musicInfoWithTag + encodeURIComponent(name), '', (res) => {
+        /**
+         * If the API returns a picture, update the image src
+         */
+        res.tags.picture && (img.src = res.tags.picture)
 
-    /**
-     * Watch the data and update the image and span text when it changes
-     */
-    watchEffect(() => {
-        if (!data.value) return
-
-        //检查data是否有tags，有就拿到tags，没有就拿到默认图片
-        data.value.tags.picture && (img.src = data.value.tags.picture);
-        //如果为空则不要填写
-        span.innerText = [data.value.tags.artist, data.value.tags.album, data.value.tags.title].filter(Boolean).join('-');
+        span.innerText = [res.tags.artist, res.tags.album, res.tags.title].filter(Boolean).join('-');
     })
 }
 
@@ -112,45 +118,18 @@ const handleLazyImage = (target) => {
  * @param {boolean} remote Whether the music is remote or not
  */
 const updateCurrentTrack = (name, remote = false) => {
-    let { data } = useFetch(ApiList.musicInfoWithTag + encodeURIComponent(name)).get().json()
-    /**
-     * Watch the data and update the current track info when it changes
-     */
-    watch(() => data.value, (value) => {
-        if (!data.value) return
+    //使用fetchData改写
+    fetchData(ApiList.musicInfoWithTag + encodeURIComponent(name), '', (res) => {
         currentTrack.value = {
-            /**
-             * @description: The name of the music
-             */
-            name: data.value.name,
-            /**
-             * @description: The url of the music
-             * @type {string}
-             */
-            url: remote ? "" : data.value.url,
-            /**
-             * @description: The album of the music
-             * @type {string}
-             */
-            album: data.value.tags.album,
-            /**
-             * @description: The cover of the music
-             * @type {string}
-             */
-            cover: data.value.tags.picture || cover,
-            /**
-             * @description: The lyrics of the music
-             * @type {string}
-             */
-            lyric: data.value.tags.lyrics,
-            /**
-             * @description: The singer of the music
-             * @type {string}
-             */
-            singer: data.value.tags.artist,
+            name: res.name,
+            url: remote ? "" : res.url,
+            album: res.tags.album,
+            cover: res.tags.picture || cover,
+            lyric: res.tags.lyrics,
+            singer: res.tags.artist
         }
         // Save the current track to local storage
-        localforage.setItem('currentTrack', toRaw(currentTrack.value))
+        localStorage.setItem('currentTrack', JSON.stringify(currentTrack.value))
     })
 }
 /**
@@ -162,7 +141,7 @@ const updateCurrentTrack = (name, remote = false) => {
 const handlePlayAll = () => {
     // If the list is empty, show a message to the user
     if (list.value.length == 0) {
-        layer.msg(' ', ' ')
+        showMsg('没有发现音乐，尝试在主页刷新一下列表吧')
         return;
     }
     // If the current device is a remote device, send the cmd to the backend
@@ -172,7 +151,7 @@ const handlePlayAll = () => {
             did: currentDevice.value.did,
             cmd: ` ${title}`
         }, (res) => {
-            res.ret == "OK" && layer.msg(` ${currentDevice.value.name}  ${title} `, ' ')
+            res.ret == "OK" && showMsg(` ${currentDevice.value.name}  ${title} `, ' ')
         })
         return;
     }
@@ -186,24 +165,18 @@ const handlePlayAll = () => {
 const handlePlay = (name) => {
     // If the current device is a remote device, send the cmd to the backend
     if (currentDevice.value.did) {
-        // Use fetchData to send the request
-        const { data: res } = useFetch(ApiList.sendCmd).post({
+        //使用fetchData改写
+        fetchData(ApiList.sendCmd, {
             did: currentDevice.value.did,
-            cmd: ' ' + title + "|" + name
-        }).json()
-        /**
-         * Watch the response and update the current track info when it changes
-         */
-        watch(() => res.value, (value) => {
-            if (!value) return
-            res.ret == "OK" //后面再执行逻辑
+            cmd: '播放列表' + title + "|" + name
+        }, (res) => {
+            res.ret == "OK" && showMsg(`已发送 播放${name} 到 ${currentDevice.value.name}`)
+            updateCurrentTrack(name, true)
         })
-        updateCurrentTrack(name, true)
         return;
     }
     // If the current device is a local device, play the first song in the list
     updateCurrentTrack(name)
-    // localforage.setItem('currentTrack', toRaw(currentTrack.value))
 }
 const nextTrack = () => {
     // console.log('%csrc\views\ListView.vue:111 list.value', 'color: #007acc;', list.value);
@@ -247,7 +220,7 @@ const changeDevice = (item) => {
     currentDevice.value = item
 }
 onMounted(() => {
-    listRefs.forEach((item, index) => {
+    listRefs.value.forEach((item, index) => {
         const { stop } = useIntersectionObserver(item, ([{ isIntersecting }]) => {
             if (!isIntersecting) {
                 return;
@@ -256,34 +229,8 @@ onMounted(() => {
             handleLazyImage(item)
         })
     })
-    //加载currentTrack
-    localforage.getItem('currentTrack').then((value) => {
-        if (value) {
-            currentTrack.value = value
-        }
-    })
 })
-/**
- * @description: 通过Fetch API来获取或发送数据
- * @param {string} url  API的url
- * @param {object} [postData={}]  POST请求时要传递的数据
- * @param {function} [callback]  回调函数
- * @return {void}
- */
-const fetchData = (url, postData = {}, callback) => {
-    fetch(url, postData ? {
-        method: 'POST',
-        body: JSON.stringify(postData),
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    } : {
-        method: 'GET',
-    }
-    ).then(res => res.json()).then(res => {
-        callback && callback(res)
-    })
-}
+
 </script>
 <style scoped lang="scss">
 /* 导入本地字体*/
@@ -294,13 +241,12 @@ const fetchData = (url, postData = {}, callback) => {
     font-style: normal
 }
 
+
 .container {
     width: 100%;
     margin: 0 auto;
 
     .header {
-        --h: 300px;
-        height: var(--h);
         background-image: linear-gradient(30deg, #bbb2ff 0%, #587cff 100%);
         display: flex;
         height: 64vw;
@@ -308,7 +254,7 @@ const fetchData = (url, postData = {}, callback) => {
         position: relative;
         width: 100%;
         z-index: -1;
-
+        align-items: center;
         .title {
             font-size: 40px;
             color: #FFFFFF;
@@ -316,13 +262,12 @@ const fetchData = (url, postData = {}, callback) => {
             overflow: hidden;
             text-align: center;
             backdrop-filter: blur(5px);
-            line-height: var(--h);
             font-family: 'AlimamaDongFangDaKai-Regular';
         }
     }
 
     .list {
-        background: #fff;
+        // background: #fff;
         border-radius: 4vw 4vw 0 0;
         position: relative;
         top: -4.267vw;
@@ -332,7 +277,7 @@ const fetchData = (url, postData = {}, callback) => {
 
         .listhead {
             align-items: center;
-            background: #fff;
+            background-color: var(--background-color);
             border-radius: 4vw 4vw 0 0;
             box-sizing: border-box;
             display: -webkit-box;
@@ -346,8 +291,7 @@ const fetchData = (url, postData = {}, callback) => {
             position: -webkit-sticky;
             /*safair*/
             position: sticky;
-            color: #262338;
-
+            color: var(--text-color);
             svg {
                 width: 5.333vw;
                 height: 5.333vw;
@@ -393,13 +337,12 @@ const fetchData = (url, postData = {}, callback) => {
 
 
                 .musictitle {
-                    color: #262338;
+                    color: var(--text-color);
                     width: 60.133vw;
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;
                     word-break: break-all;
-                    color: #262338;
                     font-size: 4.267vw;
                     font-weight: 700;
                     height: 6vw;
@@ -454,7 +397,7 @@ const fetchData = (url, postData = {}, callback) => {
 
         .listfooter {
             align-items: center;
-            background: #fff;
+            background: var(--background-color);
             border-radius: 4vw 4vw 0 0;
             box-sizing: border-box;
             display: -webkit-box;
@@ -482,5 +425,23 @@ const fetchData = (url, postData = {}, callback) => {
     svg {
         fill: #fff;
     }
+}
+@media (prefers-color-scheme: dark) {
+    .container{
+        .header {
+            background-color: #FF3CAC;
+            background-image: linear-gradient(225deg, #FF3CAC 0%, #784BA0 50%, #2B86C5 100%);
+    
+        }
+        svg{
+            fill: #fff!important;
+        }
+        .list{
+            .listhead{
+                box-shadow: 0px 14px 15px 0px rgba(0,0,0,0.1);
+            }
+        }
+    }
+
 }
 </style>

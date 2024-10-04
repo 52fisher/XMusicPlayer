@@ -104,7 +104,6 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { layer } from "vue3-layer";
 import { useSwipe, useStorage } from '@vueuse/core'
 import IconMusicPlay from './icons/IconMusicPlay.vue'
 import IconMusicPause from './icons/IconMusicPause.vue'
@@ -117,21 +116,29 @@ import IconShrink from './icons/IconShrink.vue'
 import IconDevice from './icons/IconDevice.vue'
 import IconStar from './icons/IconStar.vue'
 import IconTimer from './icons/IconTimer.vue'
-import localforage from 'localforage'
 import ModalDialog from './ModalDialog.vue'
 import ApiList from './ApiList.vue'
-
-const emit = defineEmits(['prev-track', 'next-track', 'random-track', 'handle-play', 'change-device', 'update:currentTrack', 'toggle-mini-player'])
+import fetchData from './FetchData';
+import showMsg from './ModalMsg';
+const emit = defineEmits(['prev-track',
+  'next-track',
+  'random-track',
+  'handle-play',
+  'change-device',
+  'update:currentTrack',
+  'toggle-mini-player',
+  'no-scroll',
+])
 const playState = ref(false); //true为播放 显示暂停按钮，false为暂停 显示为播放按钮
-const volume = ref(0.5);
+const volume = useStorage('volume', 0.5);
 // const loopType = ref('sequence');
 const currentTime = ref(0);
 const duration = ref(0); // 歌曲总时长
 const audio = ref()
-const audioState = ref() // 封面播放组件
+const audioState = ref(null) // 封面播放组件
 
 //循环播放
-const loopType = ref(useStorage('loopType', 0));
+const loopType = useStorage('loopType', 0);
 const loopList = ['单曲循环', '全部循环', '随机播放'];
 // 滚动偏移量
 const lyricOffset = ref(0);
@@ -147,71 +154,32 @@ const props = defineProps({
 })
 const currentTrack = computed(() => props.currentTrack);
 //投放设备
-const devices = ref([]);
+const devices = useStorage('devices', []);
 const devicesSwitch = ref(false)
-const currentDevice = ref({ name: "本机", did: "", play_type: 0 });//当前设备
+const currentDevice = useStorage('currentDevice', { name: "本机", did: "", play_type: 0 });//当前设备
 
 //定时播放开关，限remote设备
 const timerSwitch = ref(false)
 
 //全局计时器id
 const synctimer = ref(null)
-/**
- * Init function to load data from local storage
- * @function init
- */
-const init = () => {
-  /**
-   * Get the list of devices from local storage
-   * @promise
-   */
-  localforage.getItem('devices').then((value) => {
-    if (value) {
-      // Set the list of devices to the component's state
-      devices.value = value
-    }
-  })
-
-  /**
-   * Get the current device from local storage
-   * @promise
-   */
-  localforage.getItem('currentDevice').then((value) => {
-    if (value) {
-      // Set the current device to the component's state
-      currentDevice.value = value
-
-      // If the current device is a remote device, start the timer
-      if (value.did) {
-        syncRemoteMusicInfo()
-        // Set the timer to sync the music info every second
-        synctimer.value = setInterval(syncRemoteMusicInfo, 1000)
-      }
-    }
-  })
-
-  /**
-   * Get the volume from local storage
-   * @promise
-   */
-  localforage.getItem('volume').then((value) => {
-    if (value) {
-      // Set the volume to the component's state
-      volume.value = value
-    }
-  })
-}
-init()
-
-
 
 //音乐组件是否最小化,通过isMiniPlayer来控制,controls是监控的组件，通过上滑和下滑来控制isMiniPlayer
 const isMiniPlayer = ref(true);
 const controls = ref(null)
 const { isSwiping, direction } = useSwipe(controls);
 watchEffect(() => {
-  direction.value === 'down' && (isMiniPlayer.value = true)
-  direction.value === 'up' && (isMiniPlayer.value = false)
+  const body = document.body.classList;
+  if (direction.value === 'up') {
+    isMiniPlayer.value = false
+    body.add("no-scroll")
+    return;
+  }
+  if (direction.value === 'down'||isMiniPlayer.value) {
+    isMiniPlayer.value = true
+    body.remove("no-scroll")
+    return;
+  }
 })
 
 
@@ -228,8 +196,8 @@ const toggleLoopType = () => {
       did: currentDevice.value.did,
       cmd: loopList[loopType.value]
     }, (res) => {
-      //如果返回结果ret为OK，则显示layer.msg
-      res.ret == "OK" && layer.msg(currentDevice.value.name + ' 已切换为 ' + loopList[loopType.value])
+      //如果返回结果ret为OK，则显示msg
+      res.ret == "OK" && showMsg(currentDevice.value.name + ' 已切换为 ' + loopList[loopType.value])
     })
   }
 }
@@ -271,8 +239,7 @@ const changeDevice = (item) => {
     syncRemoteMusicInfo()
     synctimer.value = setInterval(syncRemoteMusicInfo, 1000)
   }
-
-  localforage.setItem('currentDevice', toRaw(item))
+  localStorage.setItem('currentDevice', JSON.stringify(toRaw(item)))
   emit('change-device', item)
 }
 
@@ -288,7 +255,6 @@ const syncRemoteMusicInfo = () => {
   fetchData(ApiList.playingMusic + currentDevice.value.did, '', (res) => {
     if (res.ret != "OK") {
       throw new Error("获取播放信息失败");
-      return;
     }
     // 如果歌曲名和res.cur_music不同，则立即获取歌曲信息
     if (res.cur_music && (currentTrack.value.name != res.cur_music)) {
@@ -322,8 +288,8 @@ const setTimer = (item) => {
     did: currentDevice.value.did,
     cmd: item + "后关机"
   }, (res) => {
-    // 如果返回结果ret为OK，则显示layer.msg
-    res.ret == "OK" && layer.msg(currentDevice.value.name + ' 已设置 ' + item + '后关机')
+    // 如果返回结果ret为OK，则显示msg
+    res.ret == "OK" && showMsg(currentDevice.value.name + ' 已设置 ' + item + '后关机')
   })
 }
 //监听currentTrack的变化，更新播放组件的封面
@@ -340,7 +306,6 @@ const onLoadedMetadata = (event) => {
     // console.log('%csrc\components\Player.vue:116 err,playState', 'color: #007acc;', err, playState);
     playState.value = true;
   });
-  // console.log('%csrc\components\Player.vue:119 currentTrack.value.cover', 'color: #007acc;', currentTrack.value.cover);
   audioState.value.src = currentTrack.value.cover;
 
 };
@@ -361,7 +326,7 @@ const togglePlay = () => {
   // 如果currentDevice的did不为空，则应该在小爱设备上进行播放
   // 若当前为播放状态，点击按钮后切换为暂停状态
   if (playState.value === true) {
-    layer.msg("已发送 关机 指令给 " + currentDevice.value.name);
+    showMsg("已发送 关机 指令给 " + currentDevice.value.name);
     fetchData(ApiList.sendCmd, {
       did: currentDevice.value.did,
       cmd: '关机'
@@ -427,7 +392,7 @@ const changeVolume = () => {
     })
   }
   //保存到本地
-  localforage.setItem('volume', volume.value);
+  localStorage.setItem('volume', volume.value);
 };
 /**
  * FavoriteSong
@@ -438,10 +403,10 @@ const FavoriteSong = () => {
   // sendcmd to inform the backend to collect the current song
   fetchData(ApiList.sendCmd, {
     did: currentDevice.value.did,
-    cmd: ' ' // collect song
+    cmd: '收藏歌曲' // collect song
   }, (res) => {
     // if the backend returns OK, show a message to the user
-    res.ret == "OK" && layer.msg("  " + currentTrack.value.name + "    ", " ");
+    res.ret == "OK" && showMsg("已收藏 " + currentTrack.value.name);
   })
 }
 // 监听歌曲播放结束
@@ -460,7 +425,7 @@ const handleTrackEnd = () => {
 const seek = () => {
   //remote的音乐无法选择播放进度
   if (currentDevice.value.did) {
-    layer.msg("远程设备无法选择播放进度");
+    showMsg("远程设备无法选择播放进度");
     return;
   }
   audio.value.currentTime = parseFloat(currentTime.value); // 跳转到新的播放位置
@@ -538,6 +503,12 @@ const isCurrentLine = (index) => {
 };
 //使用autoplay时playState变得不可靠，自动更新状态存在问题，必须在挂载完成后,监听audio的播放状态,修正状态
 onMounted(() => {
+  // If the current device is a remote device, start the timer
+  if (currentDevice.value.did) {
+    syncRemoteMusicInfo()
+    // Set the timer to sync the music info every second
+    synctimer.value = setInterval(syncRemoteMusicInfo, 1000)
+  }
   audio.value.addEventListener('playing', () => {
     playState.value = true;
     audioState?.value?.classList.add('rotate')
@@ -563,28 +534,6 @@ watch(() => playState.value, (value) => {
   !currentDevice.value.did && audio.value?.pause();
 })
 
-/**
- * @description: 通过Fetch API来获取或发送数据
- * @param {string} url  API的url
- * @param {object} [postData={}]  POST请求时要传递的数据
- * @param {function} [callback]  回调函数
- * @return {void}
- */
-const fetchData = (url, postData = {}, callback) => {
-  fetch(url, postData ? {
-    method: 'POST',
-    body: JSON.stringify(postData),
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  } : {
-    method: 'GET',
-  }
-  ).then(res => res.json()).then(res => {
-    callback && callback(res)
-  })
-}
-
 </script>
 
 <style scoped lang="scss">
@@ -598,7 +547,7 @@ const fetchData = (url, postData = {}, callback) => {
 .music_player_wrapper {
   display: flex;
   flex-direction: column-reverse;
-  background: #fff;
+  background-color: var(--background-color);
   box-sizing: border-box;
   display: -webkit-box;
   display: -webkit-flex;
@@ -609,13 +558,12 @@ const fetchData = (url, postData = {}, callback) => {
   z-index: 99;
   position: -webkit-sticky;
   position: fixed;
-  color: #262338;
+  color: var(--text-color);
   width: 100vw;
   --lh: 8.467vw;
   --fz: 5.333vw;
 
   .music_player_box {
-    background-color: white;
     width: 100vw;
     --size: clamp(50px, 20vw, 100px);
   }
@@ -777,8 +725,9 @@ const fetchData = (url, postData = {}, callback) => {
     padding: 4vw;
 
     .cover {
-      width: 80vw;
-      height: 80vw;
+      --c-size: clamp(40vh, 40vh, 80vw);
+      width: clamp(40vh, 40vh, 80vw);
+      height: clamp(40vh, 40vh, 80vw);
       border-radius: 4vw;
     }
   }
@@ -841,36 +790,16 @@ const fetchData = (url, postData = {}, callback) => {
   }
 }
 
-input[type="range"] {
-  height: 10px;
-  border: 0;
-  background-color: #f0f0f0;
-  border-radius: 5px;
-  position: relative;
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  outline: none;
-}
+@media (prefers-color-scheme: dark) {
+  .music_player_wrapper {
+    .controls {
 
-input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #ff4400;
-}
+      .prev svg,
+      .next svg {
+        fill: var(--text-color);
+      }
+    }
+  }
 
-input[type=range]::-webkit-slider-runnable-track {
-  height: 15px;
-  border-radius: 10px;
-  /*将轨道设为圆角的*/
-  box-shadow: 0 1px 1px #def3f8, inset 0 .125em .125em #0d1112;
-  /*轨道内置阴影效果*/
-  background-color: #0dc9f7;
-}
-
-input[type=range]:focus {
-  outline: none;
-  /*原始的控件获取到焦点时，会显示包裹整个控件的边框，所以还需要把边框取消。*/
 }
 </style>
