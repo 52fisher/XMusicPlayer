@@ -205,10 +205,6 @@ watch(listRefs.value, (value) => {
       background-color: #fff;
       //font-family: "AlimamaDongFangDaKai-Regular";
       font-weight: bold;
-
-      &:hover {
-        background-color: rgba(0, 0, 0, 0.05)
-      }
     }
   }
 
@@ -279,13 +275,7 @@ watch(listRefs.value, (value) => {
     }
 
     .total {
-      position: absolute;
-      top: 5px;
-      left: 2px;
-      width: 10px;
-      height: 10px;
-      line-height: 0;
-      color: #b0d9d4;
+      display: none;
     }
   }
 }

@@ -1,6 +1,6 @@
 <script>
 const base = "/";
-// const base = "http://192.168.6.131:5678/"
+
 export default {
     musicList: base + 'musiclist',
     musicInfoWithTag: base + 'musicinfo?musictag=true&name=',
