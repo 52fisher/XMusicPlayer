@@ -205,13 +205,6 @@ watch(listRefs.value, (value) => {
       background-color: #fff;
       //font-family: "AlimamaDongFangDaKai-Regular";
       font-weight: bold;
-<<<<<<< HEAD
-=======
-
-      &:hover {
-        background-color: rgba(0, 0, 0, 0.05)
-      }
->>>>>>> f8eafc8d6c2b03f023ad9b4d0a99919970cbf5f0
     }
   }
 
