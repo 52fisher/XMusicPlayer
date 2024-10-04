@@ -12,10 +12,8 @@
     "@vueuse/components": "^11.1.0",
     "@vueuse/core": "^11.1.0",
     "element-plus": "^2.8.3",
-    "localforage": "^1.10.0",
     "vue": "^3.4.29",
-    "vue-router": "^4.3.3",
-    "vue3-layer": "^1.0.18"
+    "vue-router": "^4.3.3"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.5",
