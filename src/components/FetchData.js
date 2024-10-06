@@ -1,5 +1,5 @@
-const fetchData = async (url, postData = {}, callback) => {
-    await fetch(url, postData ? {
+const fetchData = (url, postData = {}, callback) => {
+    fetch(url, postData ? {
          method: 'POST',
          body: JSON.stringify(postData),
          headers: {

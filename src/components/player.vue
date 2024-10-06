@@ -126,7 +126,6 @@ const emit = defineEmits(['prev-track',
   'handle-play',
   'change-device',
   'update:currentTrack',
-  'toggle-mini-player',
   'no-scroll',
 ])
 const playState = ref(false); //true为播放 显示暂停按钮，false为暂停 显示为播放按钮
@@ -140,8 +139,10 @@ const audioState = ref(null) // 封面播放组件
 //循环播放
 const loopType = useStorage('loopType', 0);
 const loopList = ['单曲循环', '全部循环', '随机播放'];
+
+const lyricOffsetY = ref("calc( var(--lyh) / 2 )");  
 // 滚动偏移量
-const lyricOffset = ref(0);
+const lyricOffset = ref(lyricOffsetY.value);
 
 // 滚动歌词容器的引用
 const lyricsContainer = ref(null);
@@ -175,7 +176,7 @@ watchEffect(() => {
     body.add("no-scroll")
     return;
   }
-  if (direction.value === 'down'||isMiniPlayer.value) {
+  if (direction.value === 'down' || isMiniPlayer.value) {
     isMiniPlayer.value = true
     body.remove("no-scroll")
     return;
@@ -302,11 +303,15 @@ const onLoadedMetadata = (event) => {
   // const audio = event.target;
   // console.log('%csrc\components\Player.vue:80 event', 'color: #007acc;', event);
   duration.value = event.target.duration;
-  audio.value?.play().catch((err) => {
-    // console.log('%csrc\components\Player.vue:116 err,playState', 'color: #007acc;', err, playState);
+  try {
+    audio.value.play().then(() => {
+      audioState.value.src = currentTrack.value.cover;
+    })
+
+  } catch (err) {
+    console.warn('%csrc\components\Player.vue:116 err,playState', 'color: #007acc;', err, playState);
     playState.value = true;
-  });
-  audioState.value.src = currentTrack.value.cover;
+  }
 
 };
 /**
@@ -467,13 +472,13 @@ const updateLyricOffset = () => {
   if (currentTime.value <= duration.value) {
     if (currentLyricIndex > 0) {
       //每一行高度不固定，要根据元素的实际高度来计算
-      lyricOffset.value = `calc( ( ${currentLyricIndex - 1} * -1 ) * var(--lh))`;
+      lyricOffset.value = `calc( ( ${currentLyricIndex - 1} * -1 ) * var(--lh) + ${lyricOffsetY.value} )`;
       // lyricOffset.value = (currentLyricIndex - 1) * 18 + 10; // 30px 代表每行歌词的高度
       // console.log('%csrc\components\Player.vue:236 (currentLyricIndex - 1)  * 18 + 10 ', 'color: #007acc;', (currentLyricIndex - 1) * 18 + 10);
     }
   } else {
     // 如果歌曲结束，保持在最后一行
-    lyricOffset.value = `calc( ${currentLyric.value.length - 1} * -1 * var(--lh) - var(--pd) * 2 * var(--lh))`;
+    lyricOffset.value = `calc( ${currentLyric.value.length - 1} * -1 * var(--lh) * var(--lh) + ${lyricOffsetY.value} )`;
   }
 };
 
@@ -571,7 +576,7 @@ watch(() => playState.value, (value) => {
   .music_info {
     font-size: var(--fz);
     width: 90vw;
-    height: 20vw;
+    height: 16vw;
 
     .music_name {
       display: flex;
@@ -596,7 +601,7 @@ watch(() => playState.value, (value) => {
     display: flex;
     width: 90vw;
     justify-content: end;
-    margin-bottom: 2vh;
+    margin-bottom: 1vh;
     gap: 4vw;
 
     .current_device_name {
@@ -674,7 +679,8 @@ watch(() => playState.value, (value) => {
     font-size: 4.333vw;
     line-height: var(--lh);
     font-weight: normal;
-    height: 20vh;
+    --lyh:18vh;
+    height: var(--lyh);
     overflow: hidden;
   }
 
@@ -718,16 +724,16 @@ watch(() => playState.value, (value) => {
   }
 
   .cover_wrapper {
-    height: 50vh;
+    height: 36vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 4vw;
+    padding: 1vw;
 
     .cover {
-      --c-size: clamp(40vh, 40vh, 80vw);
-      width: clamp(40vh, 40vh, 80vw);
-      height: clamp(40vh, 40vh, 80vw);
+      --c-size: clamp(8rem, 80vw, 36vh);
+      width: var(--c-size);
+      height: var(--c-size);;
       border-radius: 4vw;
     }
   }
@@ -752,13 +758,7 @@ watch(() => playState.value, (value) => {
   overflow: hidden;
 
   .music_player_box {
-    height: 28vh;
-  }
-
-  .lyrics-container {
-    position: relative;
-    height: 20vh;
-    overflow: hidden;
+    height: 26vh;
   }
 
   .controls {

@@ -46,7 +46,6 @@ import IconPlay from '@/components/icons/IconPlay.vue'
 import IconHome from '@/components/icons/IconHome.vue';
 import { useIntersectionObserver } from '@vueuse/core'
 import ApiList from '@/components/ApiList.vue'
-import cover from '/defaultcover.jpg'
 import player from '@/components/player.vue'
 import fetchData from '@/components/FetchData.js'
 import defaultcover from '/defaultcover.jpg'
@@ -68,7 +67,7 @@ const total = computed(() => {
 // const currentDevice = ref({ name: "本机", did: "" });
 const currentDevice = useStorage('currentDevice', { name: "本机", did: "" })
 
-const currentTrack = useStorage('currentTrack', { name: '', url: '', album: '', lyric: "", cover: cover, })
+const currentTrack = useStorage('currentTrack', { name: '', url: '', album: '', lyric: "", cover: defaultcover, })
 
 
 const loadRenderList = () => {
@@ -124,7 +123,7 @@ const updateCurrentTrack = (name, remote = false) => {
             name: res.name,
             url: remote ? "" : res.url,
             album: res.tags.album,
-            cover: res.tags.picture || cover,
+            cover: res.tags.picture || defaultcover,
             lyric: res.tags.lyrics,
             singer: res.tags.artist
         }
