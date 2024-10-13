@@ -54,25 +54,28 @@ const route = useRoute()
 //分类标题
 const title = route.params.title
 //歌曲清单
-const list = useStorage('list', [])
+// const musicList = useStorage('musicList', [])
+const musicList = Object.freeze(localStorage.getItem('musicList') ? JSON.parse(localStorage.getItem('musicList')) : {})
+const list = musicList.hasOwnProperty(title) ? musicList[title] : [];
+const favoriteList = musicList.hasOwnProperty('收藏') ? musicList['收藏'] : [];
 const listRefs = ref([]);
 //渲染列表,渲染30首
-const renderList = ref(list.value.slice(0, 30))
+const renderList = ref(list.slice(0, 30))
 
 //歌曲总数
 const total = computed(() => {
-    return list.value.length
+    return list.length
 })
 //当前设备，默认本机
 // const currentDevice = ref({ name: "本机", did: "" });
 const currentDevice = useStorage('currentDevice', { name: "本机", did: "" })
 
-const currentTrack = useStorage('currentTrack', { name: '', url: '', album: '', lyric: "", cover: defaultcover, })
+const currentTrack = useStorage('currentTrack', { name: '', url: '', album: '', lyric: "", cover: defaultcover, star: false })
 
 
 const loadRenderList = () => {
     let index = renderList.value.length
-    renderList.value = list.value.slice(0, index + 30)
+    renderList.value = list.slice(0, index + 30)
 }
 
 watch(listRefs.value, () => {
@@ -125,7 +128,8 @@ const updateCurrentTrack = (name, remote = false) => {
             album: res.tags.album,
             cover: res.tags.picture || defaultcover,
             lyric: res.tags.lyrics,
-            singer: res.tags.artist
+            singer: res.tags.artist,
+            star: favoriteList.includes(name)
         }
         // Save the current track to local storage
         localStorage.setItem('currentTrack', JSON.stringify(currentTrack.value))
@@ -139,7 +143,7 @@ const updateCurrentTrack = (name, remote = false) => {
  */
 const handlePlayAll = () => {
     // If the list is empty, show a message to the user
-    if (list.value.length == 0) {
+    if (total.value == 0) {
         showMsg('没有发现音乐，尝试在主页刷新一下列表吧')
         return;
     }
@@ -187,13 +191,13 @@ const nextTrack = () => {
         })
         return;
     }
-    let index = list.value.indexOf(currentTrack.value.name)
-    if (index === list.value.length - 1) {
+    let index = list.indexOf(currentTrack.value.name)
+    if (index === total.value - 1) {
         index = 0
     } else {
         index += 1
     }
-    handlePlay(list.value[index])
+    handlePlay(list[index])
 }
 const prevTrack = () => {
     if (currentDevice.value.did) {
@@ -203,17 +207,17 @@ const prevTrack = () => {
         })
         return;
     }
-    let index = list.value.indexOf(currentTrack.value.name)
+    let index = list.indexOf(currentTrack.value.name)
     if (index === 0) {
-        index = list.value.length - 1
+        index = list.length - 1
     } else {
         index -= 1
     }
-    handlePlay(list.value[index])
+    handlePlay(list[index])
 }
 const randomTrack = () => {
-    const index = Math.floor(Math.random() * list.value.length)
-    handlePlay(list.value[index])
+    const index = Math.floor(Math.random() * list.length)
+    handlePlay(list[index])
 }
 const changeDevice = (item) => {
     currentDevice.value = item

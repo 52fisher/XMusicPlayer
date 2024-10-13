@@ -96,7 +96,7 @@ const layoutType = computed(() => {
 //通过list/title获取对应的musicList
 const router = useRouter()
 const handleRouter = (name) => {
-  localStorage.setItem('list', JSON.stringify(musicList.value[name]))
+  // localStorage.setItem('list', JSON.stringify(musicList.value[name]))
   router.push({ name: 'list', params: { title: name } })
 }
 //缓存设置中的devices

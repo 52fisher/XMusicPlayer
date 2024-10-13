@@ -84,8 +84,8 @@
     <div class="music_info " v-if="!isMiniPlayer">
       <div class="music_name">
         <div class="music_title wordType">{{ currentTrack.name }}</div>
-        <div class="music_star" v-if="currentDevice.did" @click="FavoriteSong">
-          <IconStar />
+        <div class="music_star" v-show="currentDevice.did" @click="FavoriteSong">
+          <IconStar :class="{ stared: stared }" />
         </div>
       </div>
       <div class="music_singer">{{ currentTrack.singer }}</div>
@@ -140,7 +140,7 @@ const audioState = ref(null) // 封面播放组件
 const loopType = useStorage('loopType', 0);
 const loopList = ['单曲循环', '全部循环', '随机播放'];
 
-const lyricOffsetY = ref("calc( var(--lyh) / 2 )");  
+const lyricOffsetY = ref("calc( var(--lyh) / 2 )");
 // 滚动偏移量
 const lyricOffset = ref(lyricOffsetY.value);
 
@@ -154,6 +154,8 @@ const props = defineProps({
   }
 })
 const currentTrack = computed(() => props.currentTrack);
+//是否收藏
+const stared = ref(currentTrack.value.star);
 //投放设备
 const devices = useStorage('devices', []);
 const devicesSwitch = ref(false)
@@ -406,12 +408,16 @@ const changeVolume = () => {
  */
 const FavoriteSong = () => {
   // sendcmd to inform the backend to collect the current song
+  let cmd = stared.value ? '取消收藏' : '加入收藏' // collect song
   fetchData(ApiList.sendCmd, {
     did: currentDevice.value.did,
-    cmd: '收藏歌曲' // collect song
+    cmd: cmd // collect song
   }, (res) => {
     // if the backend returns OK, show a message to the user
-    res.ret == "OK" && showMsg("已收藏 " + currentTrack.value.name);
+    if (res.ret == "OK") {
+      showMsg("已" + cmd + currentTrack.value.name);
+      stared.value = !stared.value;
+    }
   })
 }
 // 监听歌曲播放结束
@@ -588,6 +594,10 @@ watch(() => playState.value, (value) => {
         height: 6vw;
 
       }
+
+      .stared {
+        fill: #D81159;
+      }
     }
 
     .music_singer {
@@ -679,7 +689,7 @@ watch(() => playState.value, (value) => {
     font-size: 4.333vw;
     line-height: var(--lh);
     font-weight: normal;
-    --lyh:18vh;
+    --lyh: 18vh;
     height: var(--lyh);
     overflow: hidden;
   }
@@ -733,7 +743,8 @@ watch(() => playState.value, (value) => {
     .cover {
       --c-size: clamp(8rem, 80vw, 36vh);
       width: var(--c-size);
-      height: var(--c-size);;
+      height: var(--c-size);
+      ;
       border-radius: 4vw;
     }
   }
