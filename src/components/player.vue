@@ -84,7 +84,7 @@
     <div class="music_info " v-if="!isMiniPlayer">
       <div class="music_name">
         <div class="music_title wordType">{{ currentTrack.name }}</div>
-        <div class="music_star" v-show="currentDevice.did" @click="FavoriteSong">
+        <div class="music_star" v-show="currentDevice.did" @click="favoriteSong">
           <IconStar :class="{ stared: stared }" />
         </div>
       </div>
@@ -127,6 +127,7 @@ const emit = defineEmits(['prev-track',
   'change-device',
   'update:currentTrack',
   'no-scroll',
+  'favoriteSong',
 ])
 const playState = ref(false); //true为播放 显示暂停按钮，false为暂停 显示为播放按钮
 const volume = useStorage('volume', 0.5);
@@ -402,11 +403,11 @@ const changeVolume = () => {
   localStorage.setItem('volume', volume.value);
 };
 /**
- * FavoriteSong
+ * favoriteSong
  * @description: Collect the current song
  * @returns {void}
  */
-const FavoriteSong = () => {
+const favoriteSong = () => {
   // sendcmd to inform the backend to collect the current song
   let cmd = stared.value ? '取消收藏' : '加入收藏' // collect song
   fetchData(ApiList.sendCmd, {
@@ -419,6 +420,7 @@ const FavoriteSong = () => {
       stared.value = !stared.value;
     }
   })
+  emit('favoriteSong',currentTrack.value.name,stared.value)
 }
 // 监听歌曲播放结束
 const handleTrackEnd = () => {
@@ -578,7 +580,6 @@ watch(() => playState.value, (value) => {
     width: 100vw;
     --size: clamp(50px, 20vw, 100px);
   }
-
   .music_info {
     font-size: var(--fz);
     width: 90vw;
@@ -592,7 +593,6 @@ watch(() => playState.value, (value) => {
       svg {
         width: 6vw;
         height: 6vw;
-
       }
 
       .stared {
@@ -637,6 +637,10 @@ watch(() => playState.value, (value) => {
       justify-content: center;
       align-items: center;
     }
+    svg{
+      width: calc(var(--size) * 0.4);
+      height: calc(var(--size) * 0.4);
+    }
   }
 
   .progress_bar {
@@ -665,8 +669,8 @@ watch(() => playState.value, (value) => {
       opacity: .8;
       background: #f0f0f0;
       border-radius: var(--size);
-      width: calc(var(--size) * 0.4);
-      height: calc(var(--size) * 0.4);
+      width: calc(var(--size) * 0.5);
+      height: calc(var(--size) * 0.5);
       justify-content: center;
     }
 

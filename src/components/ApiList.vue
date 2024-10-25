@@ -1,6 +1,5 @@
 <script>
-const base = "/";
-// const base = "http://192.168.6.131:5678/"
+const base = import.meta.env.VITE_BASE_URL;
 
 export default {
     musicList: base + 'musiclist',

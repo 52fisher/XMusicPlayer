@@ -58,8 +58,8 @@ const useList = (remote = false) => {
     mList.value = data
     let musicKeys = Object.keys(data);
     // 删除musicKeys中的 全部 和 所有歌曲 ，添加到第一项
-    musicKeys = musicKeys.filter((item) => item !== "全部" && item !== "所有歌曲");
-    tList.value = ["全部", "所有歌曲", ...musicKeys].map(item => {
+    musicKeys = musicKeys.filter((item) => item !== "全部" && item !== "所有歌曲" && item !== "收藏");
+    tList.value = ["全部", "所有歌曲", '收藏', ...musicKeys].map(item => {
       return {
         title: item,
         total: data[item].length
@@ -184,7 +184,7 @@ watch(listRefs.value, (value) => {
     align-content: center;
     align-items: center;
     gap: 5vw;
-
+//    width: 90vw;
     .refresh-loading {
       animation: rotate 1s linear;
     }
@@ -239,7 +239,7 @@ watch(listRefs.value, (value) => {
   }
 
   .grid_layout {
-    --size: clamp(8rem, 10vw, 10rem);;
+    --size: clamp(8rem, 10vw, 10rem);
     display: grid;
     justify-content: space-around;
     grid-template-columns: repeat(auto-fill, var(--size));

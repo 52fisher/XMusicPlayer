@@ -33,7 +33,7 @@
 
             <player :currentTrack="currentTrack" @next-track="nextTrack" @prev-track="prevTrack"
                 @random-track="randomTrack" @handle-play="handlePlay" @change-device="changeDevice"
-                @update:currentTrack="updateCurrentTrack">
+                @update:currentTrack="updateCurrentTrack" @favorite-song="handleFavorite">
 
             </player>
         </div>
@@ -54,10 +54,13 @@ const route = useRoute()
 //分类标题
 const title = route.params.title
 //歌曲清单
-// const musicList = useStorage('musicList', [])
-const musicList = Object.freeze(localStorage.getItem('musicList') ? JSON.parse(localStorage.getItem('musicList')) : {})
-const list = musicList.hasOwnProperty(title) ? musicList[title] : [];
-const favoriteList = musicList.hasOwnProperty('收藏') ? musicList['收藏'] : [];
+const musicList = useStorage('musicList', [])
+//分类列表
+const titleList = useStorage('titleList', [])
+// const musicList = Object.freeze(localStorage.getItem('musicList') ? JSON.parse(localStorage.getItem('musicList')) : {})
+const list = musicList.value[title];
+
+const favoriteList = musicList.value['收藏'];
 const listRefs = ref([]);
 //渲染列表,渲染30首
 const renderList = ref(list.slice(0, 30))
@@ -91,6 +94,37 @@ watch(listRefs.value, () => {
 const disabled = computed(() => {
     return renderList.value.length >= total.value
 })
+const handleFavorite = (name,stared) => {
+    //stared为收藏状态,true为收藏，false为取消收藏
+    //如果stared为true，则将歌曲加入到收藏中，否则将歌曲从收藏中移除
+    if (stared) {
+        favoriteList.splice(favoriteList.indexOf(name), 1)
+        //将titleList对应的收藏数量减1
+        titleList.value = titleList.value.map(item => {
+            if (item.title === "收藏") {
+                return {
+                    title: item.title,
+                    total: item.total - 1
+                }
+            } 
+            return item
+        })
+        return;
+    }
+    //将歌曲加入到收藏中
+    favoriteList.push(name)
+    titleList.value = titleList.value.map(item => {
+            if (item.title === "收藏") {
+                return {
+                    title: item.title,
+                    total: item.total + 1
+                }
+            } 
+            return item
+        })
+    // console.log('%csrc\views\ListView.vue:99 musicList.value 收藏', 'color: #007acc;', musicList.value['收藏']);
+    
+}
 /**
  * @description: Lazy load images and fetch music info
  * @param {HTMLElement} target The element that contains the image
@@ -394,6 +428,10 @@ onMounted(() => {
                     overflow: hidden;
                     padding-right: 2vw;
                     width: 24.933vw;
+                    svg{
+                        width: 4.8vw;
+                        height: 4.8vw;
+                    }
                 }
             }
         }
