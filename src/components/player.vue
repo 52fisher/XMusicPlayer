@@ -420,7 +420,7 @@ const favoriteSong = () => {
       stared.value = !stared.value;
     }
   })
-  emit('favoriteSong',currentTrack.value.name,stared.value)
+  emit('favoriteSong', currentTrack.value.name, stared.value)
 }
 // 监听歌曲播放结束
 const handleTrackEnd = () => {
@@ -580,6 +580,7 @@ watch(() => playState.value, (value) => {
     width: 100vw;
     --size: clamp(50px, 20vw, 100px);
   }
+
   .music_info {
     font-size: var(--fz);
     width: 90vw;
@@ -637,7 +638,8 @@ watch(() => playState.value, (value) => {
       justify-content: center;
       align-items: center;
     }
-    svg{
+
+    svg {
       width: calc(var(--size) * 0.4);
       height: calc(var(--size) * 0.4);
     }
@@ -649,6 +651,8 @@ watch(() => playState.value, (value) => {
     align-content: center;
     width: 80vw;
     margin: 0 auto;
+    font-size: initial;
+    line-height: initial;
   }
 
   .audio_state {
