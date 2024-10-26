@@ -2,7 +2,9 @@
   <div class="music_player_wrapper" :class="isMiniPlayer ? 'mini' : ' full '">
     <div class="music_player_box">
       <audio ref="audio" :src="currentTrack.url" @loadedmetadata="onLoadedMetadata" @timeupdate="updateCurrentTime"
-        @ended="handleTrackEnd" autoplay></audio>
+        @ended="handleTrackEnd" autoplay
+        @durationchange="duration = $event.target.duration">
+      </audio>
       <!-- 标题、收藏 -->
 
       <!-- 设备投放选择 -->
