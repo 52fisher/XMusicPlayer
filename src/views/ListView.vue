@@ -269,7 +269,7 @@ onMounted(() => {
 })
 
 </script>
-<style scoped lang="scss">
+<style  lang="scss">
 /* 导入本地字体*/
 @font-face {
     font-family: 'AlimamaDongFangDaKai-Regular';
