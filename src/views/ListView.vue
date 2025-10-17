@@ -278,57 +278,84 @@ onMounted(() => {
     font-style: normal
 }
 
+// CSS变量系统 - 便于统一管理和响应式适配
+:root {
+    // 颜色变量
+    --primary-color: #587cff;
+    --primary-gradient-start: #bbb2ff;
+    --primary-gradient-end: #587cff;
+    --text-color: #262338;
+    --text-secondary-color: #a1a4b3;
+    --background-color: #fff;
+    
+    // 移动端尺寸变量
+    --header-height-mobile: 64vw;
+    --header-title-size-mobile: clamp(1.8rem, 8vw, 2.5rem);
+    --border-radius-mobile: 4vw;
+    --font-size-base-mobile: clamp(1rem, 5vw, 1.3rem);
+    --list-item-height-mobile: 17.333vw;
+    --cover-size-mobile: 14.333vw;
+    
+    // 平板横屏尺寸变量
+    --header-height-tablet: 30vw;
+    --header-title-size-tablet: clamp(2.2rem, 5vw, 3rem);
+    --border-radius-tablet: 2vw;
+    --font-size-base-tablet: clamp(1rem, 2.5vw, 1.1rem);
+    --list-item-height-tablet: 12vw;
+    --cover-size-tablet: 10vw;
+}
 
+// 基础样式
 .container {
     width: 100%;
     margin: 0 auto;
+    min-height: 100vh;
+    background-color: var(--background-color);
 
     .header {
-        background-image: linear-gradient(30deg, #bbb2ff 0%, #587cff 100%);
+        background-image: linear-gradient(30deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
         display: flex;
-        height: 64vw;
+        height: var(--header-height-mobile);
         justify-content: center;
         position: relative;
         width: 100%;
-        z-index: -1;
+        z-index: 1;
         align-items: center;
         .title {
-            font-size: 40px;
+            font-size: var(--header-title-size-mobile);
             color: #FFFFFF;
             text-overflow: ellipsis;
             overflow: hidden;
             text-align: center;
             backdrop-filter: blur(5px);
             font-family: 'AlimamaDongFangDaKai-Regular';
+            padding: 0 20px;
         }
     }
 
     .list {
-        // background: #fff;
-        border-radius: 4vw 4vw 0 0;
+        border-radius: var(--border-radius-mobile) var(--border-radius-mobile) 0 0;
         position: relative;
         top: -4.267vw;
-        font-size: 5.333vw;
+        font-size: var(--font-size-base-mobile);
         font-weight: 700;
-        line-height: 7.467vw;
+        line-height: 1.4;
+        background-color: var(--background-color);
 
         .listhead {
             align-items: center;
             background-color: var(--background-color);
-            border-radius: 4vw 4vw 0 0;
+            border-radius: var(--border-radius-mobile) var(--border-radius-mobile) 0 0;
             box-sizing: border-box;
-            display: -webkit-box;
-            display: -webkit-flex;
-            display: -ms-flexbox;
             display: flex;
             justify-content: space-between;
             padding: 5.6vw 4.8vw 4.8vw 6.533vw;
             top: 0;
             z-index: 99;
-            position: -webkit-sticky;
-            /*safair*/
             position: sticky;
             color: var(--text-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            
             svg {
                 width: 5.333vw;
                 height: 5.333vw;
@@ -337,41 +364,65 @@ onMounted(() => {
             .listheadright {
                 display: flex;
                 align-items: center;
-                cursor: default;
+                cursor: pointer;
+                transition: transform 0.2s ease;
+                padding: 6px 12px;
+                border-radius: 20px;
+                background-color: rgba(88, 124, 255, 0.1);
+                
+                &:active {
+                    transform: scale(0.95);
+                    background-color: rgba(88, 124, 255, 0.2);
+                }
             }
         }
 
         .listcontent {
             margin-bottom: 21.333vw;
+            padding: 0 4vw;
+            
+            // 移动端单列布局
+            .music-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 1.5vw;
+            }
 
             .singersMusicList {
                 align-items: center;
                 box-sizing: border-box;
-                display: -webkit-box;
-                display: -webkit-flex;
-                display: -ms-flexbox;
                 display: flex;
-                width: 100vw;
-                height: 17.333vw;
-                font-size: 4.8vw;
+                width: 100%;
+                height: var(--list-item-height-mobile);
+                font-size: clamp(0.9rem, 4vw, 1.1rem);
                 font-weight: 700;
+                padding: 2vw 0;
+                border-radius: 8px;
+                transition: background-color 0.2s ease;
+                
+                &:active {
+                    background-color: rgba(0,0,0,0.05);
+                }
 
                 .order {
-                    color: #a1a4b3;
+                    color: var(--text-secondary-color);
                     text-align: center;
                     width: 15.333vw;
+                    font-size: clamp(0.8rem, 3.5vw, 1rem);
                 }
 
                 .cover {
                     margin-right: 2.667vw;
+                    flex-shrink: 0;
 
                     img {
-                        width: 14.333vw;
-                        height: 14.333vw;
+                        width: var(--cover-size-mobile);
+                        height: var(--cover-size-mobile);
                         border-radius: 1.333vw;
+                        object-fit: cover;
+                        transition: transform 0.2s ease;
                     }
                 }
-
 
                 .musictitle {
                     color: var(--text-color);
@@ -380,7 +431,7 @@ onMounted(() => {
                     text-overflow: ellipsis;
                     white-space: nowrap;
                     word-break: break-all;
-                    font-size: 4.267vw;
+                    font-size: clamp(0.9rem, 4vw, 1.1rem);
                     font-weight: 700;
                     height: 6vw;
                     line-height: 6vw;
@@ -388,28 +439,27 @@ onMounted(() => {
 
                 .wordBody {
                     width: 60.133vw;
+                    flex-shrink: 1;
+                    overflow: hidden;
                 }
 
                 .wordBody_body {
                     align-items: center;
-                    color: #a1a4b3;
-                    display: -webkit-box;
-                    display: -webkit-flex;
-                    display: -ms-flexbox;
+                    color: var(--text-secondary-color);
                     display: flex;
-                    font-size: 3.2vw;
+                    font-size: clamp(0.7rem, 3vw, 0.9rem);
                     font-weight: 400;
                     height: 4.533vw;
                     line-height: 4.533vw;
                     margin-top: .933vw;
-                    width: 50.667vw;
+                    width: 100%;
 
                     span {
-                        color: #a1a4b3;
+                        color: var(--text-secondary-color);
                         display: inline-block;
                         font-weight: 400;
                         height: 4.533vw;
-                        width: 45.867vw;
+                        width: 100%;
                         overflow: hidden;
                         text-overflow: ellipsis;
                         white-space: nowrap;
@@ -420,17 +470,23 @@ onMounted(() => {
                 .wordBody_butt {
                     align-items: center;
                     box-sizing: border-box;
-                    display: -webkit-box;
-                    display: -webkit-flex;
-                    display: -ms-flexbox;
                     display: flex;
-                    height: 17.333vw;
+                    justify-content: flex-end;
+                    height: var(--list-item-height-mobile);
                     overflow: hidden;
                     padding-right: 2vw;
-                    width: 24.933vw;
-                    svg{
-                        width: 4.8vw;
-                        height: 4.8vw;
+                    width: 15vw;
+                    flex-shrink: 0;
+                    
+                    svg {
+                        width: clamp(1rem, 4.5vw, 1.2rem);
+                        height: clamp(1rem, 4.5vw, 1.2rem);
+                        cursor: pointer;
+                        transition: transform 0.2s ease;
+                        
+                        &:active {
+                            transform: scale(0.9);
+                        }
                     }
                 }
             }
@@ -439,19 +495,15 @@ onMounted(() => {
         .listfooter {
             align-items: center;
             background: var(--background-color);
-            border-radius: 4vw 4vw 0 0;
+            border-radius: var(--border-radius-mobile) var(--border-radius-mobile) 0 0;
             box-sizing: border-box;
-            display: -webkit-box;
-            display: -webkit-flex;
-            display: -ms-flexbox;
             display: flex;
             justify-content: space-between;
             bottom: 0;
             z-index: 99;
-            position: -webkit-sticky;
-            position: fixed;
-            color: #262338;
-            width: 100vw;
+            position: sticky;
+            color: var(--text-color);
+            width: 100%;
         }
     }
 }
@@ -465,24 +517,191 @@ onMounted(() => {
 
     svg {
         fill: #fff;
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        
+        &:active {
+            transform: scale(0.9);
+        }
     }
 }
-@media (prefers-color-scheme: dark) {
-    .container{
+
+// 平板设备横屏适配 - 768px及以上且横屏
+@media (min-width: 768px) and (orientation: landscape) {
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+        
         .header {
-            background-color: #FF3CAC;
-            background-image: linear-gradient(225deg, #FF3CAC 0%, #784BA0 50%, #2B86C5 100%);
-    
+            height: var(--header-height-tablet);
+            margin: 0 -20px;
+            
+            .title {
+                font-size: var(--header-title-size-tablet);
+            }
         }
-        svg{
-            fill: #fff!important;
-        }
-        .list{
-            .listhead{
-                box-shadow: 0px 14px 15px 0px rgba(0,0,0,0.1);
+        
+        .list {
+            top: -2vw;
+            font-size: var(--font-size-base-tablet);
+            border-radius: var(--border-radius-tablet) var(--border-radius-tablet) 0 0;
+            
+            .listhead {
+                border-radius: var(--border-radius-tablet) var(--border-radius-tablet) 0 0;
+                padding: 2vw 3vw;
+                
+                svg {
+                    width: 2.5vw;
+                    height: 2.5vw;
+                }
+            }
+            
+            .listcontent {
+                margin-bottom: 10vw;
+                
+                // 平板横屏双列网格布局
+                .music-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 1.5vw;
+                }
+                
+                .singersMusicList {
+                    height: var(--list-item-height-tablet);
+                    border-radius: 12px;
+                    padding: 1vw;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                    margin-bottom: 1vw;
+                    
+                    .order {
+                        width: 8vw;
+                        font-size: clamp(0.8rem, 1.8vw, 1rem);
+                    }
+                    
+                    .cover {
+                        img {
+                            width: var(--cover-size-tablet);
+                            height: var(--cover-size-tablet);
+                            border-radius: 8px;
+                        }
+                    }
+                    
+                    .musictitle {
+                        width: 100%;
+                        font-size: clamp(0.9rem, 2vw, 1.1rem);
+                        height: auto;
+                        line-height: 1.4;
+                    }
+                    
+                    .wordBody {
+                        width: 100%;
+                    }
+                    
+                    .wordBody_body {
+                        font-size: clamp(0.7rem, 1.6vw, 0.9rem);
+                        height: auto;
+                        line-height: 1.4;
+                        margin-top: 0.5vw;
+                    }
+                    
+                    .wordBody_body span {
+                        height: auto;
+                    }
+                    
+                    .wordBody_butt {
+                        width: 10vw;
+                        padding-right: 0;
+                        
+                        svg {
+                            width: clamp(1rem, 2.2vw, 1.2rem);
+                            height: clamp(1rem, 2.2vw, 1.2rem);
+                        }
+                    }
+                }
             }
         }
     }
+}
 
+// 桌面设备适配
+@media (min-width: 1024px) {
+    .container {
+        .list {
+            .listcontent {
+                .music-grid {
+                    grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+                }
+                
+                .singersMusicList {
+                    :hover {
+                        background-color: rgba(0,0,0,0.02);
+                    }
+                    
+                    .cover img {
+                        :hover {
+                            transform: scale(1.03);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 深色模式适配
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-color: #121212;
+        --text-color: #e0e0e0;
+        --text-secondary-color: #a0a0a0;
+        --primary-gradient-start: #6a11cb;
+        --primary-gradient-end: #2575fc;
+    }
+    
+    .container {
+        .header {
+            background-color: #1a1a1a;
+            background-image: linear-gradient(225deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+        }
+        
+        svg {
+            fill: #fff !important;
+        }
+        
+        .list {
+            .listhead {
+                box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+                background-color: var(--background-color);
+            }
+        }
+        
+        .singersMusicList {
+            :active {
+                background-color: rgba(255,255,255,0.08);
+            }
+        }
+    }
+}
+
+// 小屏幕移动设备优化
+@media (max-width: 360px) {
+    .container {
+        .listcontent {
+            padding: 0 3vw;
+        }
+        
+        .singersMusicList {
+            .musictitle {
+                width: 55vw;
+            }
+            
+            .wordBody {
+                width: 55vw;
+            }
+        }
+    }
 }
 </style>

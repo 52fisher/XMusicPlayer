@@ -1,6 +1,6 @@
 <template>
-  <div class="container" v-if="!loading">
-    <div class="header">
+  <div class="home-container" v-if="!loading">
+    <div class="home-header">
       <div class="layout_switch">
         <el-switch v-model="layout" :active-icon="IconList" inline-prompt :inactive-icon="IconGrid" />
       </div>
@@ -155,7 +155,7 @@ watch(listRefs.value, (value) => {
 })
 </script>
 <style lang="scss" scoped>
-/* 导入本地字体*/
+// 导入本地字体
 @font-face {
   font-family: 'AlimamaDongFangDaKai-Regular';
   src: url('@/assets/AlimamaDongFangDaKai-Regular.woff2');
@@ -163,99 +163,159 @@ watch(listRefs.value, (value) => {
   font-style: normal
 }
 
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
+// CSS变量系统 - 全局主题控制
+:root {
+  // 颜色变量
+  --primary-color: #D81159;
+  --text-color: #2d2d33;
+  --text-secondary: #6b7280;
+  --background-color: #ffffff;
+  --surface-color: #ffffff;
+  --border-color: #CFD6DE;
+  --hover-color: #f9fafb;
+  
+  // 尺寸变量
+  --header-height: 60px;
+  --item-spacing: 10px;
+  --border-radius: 8px;
+  
+  // 字体变量
+  --font-main: 'AlimamaDongFangDaKai-Regular', system-ui, sans-serif;
+}
 
-  to {
-    transform: rotate(360deg);
+// 深色模式支持
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #EC4899;
+    --text-color: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --background-color: #111827;
+    --surface-color: #1f2937;
+    --border-color: #374151;
+    --hover-color: #374151;
   }
 }
 
-.container {
+// 动画定义
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.home-container {
   width: 100%;
   max-width: 800px;
   margin: 0 auto;
+  padding: 16px;
+  background-color: var(--background-color);
+  min-height: 100vh;
+  color: var(--text-color);
 
-  .header {
+  .home-header {
     display: flex;
     justify-content: end;
-    align-content: center;
     align-items: center;
-    gap: 5vw;
-//    width: 90vw;
+    gap: 20px;
+    margin-bottom: 20px;
+    height: var(--header-height);
+    animation: fadeIn 0.5s ease-out;
+
     .refresh-loading {
-      animation: rotate 1s linear;
+      animation: rotate 1s linear infinite;
     }
   }
 
   .music_list {
     cursor: default;
-    width: 90%;
-    margin: 0 auto;
+    width: 100%;
+    animation: fadeIn 0.5s ease-out 0.2s both;
 
     .music_list_item {
-      margin: 10px 0;
-      color: #2d2d33;
+      margin: var(--item-spacing) 0;
+      color: var(--text-color);
       text-overflow: ellipsis;
       overflow: hidden;
-      text-align: center;
       backdrop-filter: blur(5px);
-      background-color: #fff;
-      //font-family: "AlimamaDongFangDaKai-Regular";
+      background-color: var(--surface-color);
+      font-family: var(--font-main);
       font-weight: bold;
+      border-radius: var(--border-radius);
+      border: 1px solid var(--border-color);
+      transition: all 0.3s ease;
+      cursor: pointer;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        background-color: var(--hover-color);
+      }
     }
   }
 
+  // 平铺布局优化
   .flat_layout {
-
     .music_list_item {
-      margin: 10px auto;
-      height: 40px;
-      line-height: 40px;
-      border-radius: 8px;
+      margin: var(--item-spacing) auto;
+      height: 48px;
+      line-height: 48px;
       display: flex;
       justify-content: center;
-      border: 1px solid var(--text-color);
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
     }
-
 
     .cover {
       display: none;
     }
 
     .total {
-      margin: 0 5px;
+      color: var(--text-secondary);
+      font-weight: normal;
+      font-size: 0.9em;
     }
 
     .total::before {
-      content: "("
+      content: "(";
     }
 
     .total::after {
-      content: ")"
+      content: ")";
     }
   }
 
+  // 网格布局优化 - 响应式设计
   .grid_layout {
-    --size: clamp(8rem, 10vw, 10rem);
+    --grid-item-size: clamp(120px, 18vw, 160px);
     display: grid;
-    justify-content: space-around;
-    grid-template-columns: repeat(auto-fill, var(--size));
-    grid-column-gap: 2vw;
+    grid-template-columns: repeat(auto-fill, minmax(var(--grid-item-size), 1fr));
+    gap: clamp(16px, 3vw, 24px);
+    justify-content: center;
 
     .music_list_item {
-      width: var(--size);
-      height: var(--size);
-      border: 1px solid #CFD6DE;
-      border-radius: 8px;
-      font-size: clamp(0.5em, 1.5vw, 1em);
+      width: var(--grid-item-size);
+      height: var(--grid-item-size);
       position: relative;
       background-size: cover;
+      background-position: center;
+      overflow: hidden;
+      margin: 0;
 
-      .cover img {
-        width: var(--size);
+      .cover {
+        width: 100%;
+        height: 100%;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.3s ease;
+        }
       }
 
       .title {
@@ -263,20 +323,66 @@ watch(listRefs.value, (value) => {
         display: flex;
         justify-content: center;
         align-items: center;
-        align-content: center;
-        height: 30px;
-        left: 50%;
-        transform: translateX(-50%);
+        height: 40px;
         width: 100%;
-        backdrop-filter: blur(5px);
-        background-color: rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(8px);
+        background-color: rgba(255, 255, 255, 0.7);
         bottom: 0;
+        font-size: clamp(0.8em, 2vw, 1em);
+        padding: 0 8px;
+        text-align: center;
+        transition: background-color 0.3s ease;
+
+        // 深色模式下的标题背景
+        @media (prefers-color-scheme: dark) {
+          background-color: rgba(0, 0, 0, 0.7);
+        }
+      }
+
+      &:hover img {
+        transform: scale(1.05);
       }
     }
 
     .total {
       display: none;
     }
+  }
+}
+
+// 加载动画优化
+.loading_mask {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+// 响应式断点优化
+@media (max-width: 768px) {
+  .home-container {
+    padding: 12px;
+  }
+  
+  .grid_layout {
+    --grid-item-size: clamp(100px, 25vw, 140px);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-container {
+    .home-header {
+      gap: 16px;
+    }
+    
+    .grid_layout {
+      --grid-item-size: clamp(80px, 30vw, 120px);
+    }
+  }
+}
+
+// 高分辨率屏幕优化
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .music_list_item {
+    border: 0.5px solid var(--border-color);
   }
 }
 </style>

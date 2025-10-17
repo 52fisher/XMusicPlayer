@@ -1,5 +1,6 @@
 <template>
-  <div class="music_player_wrapper" :class="isMiniPlayer ? 'mini' : ' full '">
+  <div class="music_player_wrapper" :class="isMiniPlayer ? 'mini' : ' full '"
+  @click="isMiniPlayer = !isMiniPlayer">
     <div class="music_player_box">
       <audio ref="audio" :src="currentTrack.url" @loadedmetadata="onLoadedMetadata" @timeupdate="updateCurrentTime"
         @ended="handleTrackEnd" autoplay
@@ -10,7 +11,7 @@
       <!-- 设备投放选择 -->
       <div class="device_setting" v-if="!isMiniPlayer">
         <div class="current_device_name">{{ currentDevice.name }}</div>
-        <div class="shutdown" @click="timerSwitch = true" v-if="currentDevice.did">
+        <div class="shutdown" @click.stop="timerSwitch = true" v-if="currentDevice.did">
           <IconTimer />
           <ModalDialog @close="timerSwitch = false" v-if="timerSwitch">
             <template #title>选择定时关闭的时间</template>
@@ -21,7 +22,7 @@
             </template>
           </ModalDialog>
         </div>
-        <div class="cast_device" @click="devicesSwitch = true">
+        <div class="cast_device" @click.stop="devicesSwitch = true">
           <IconDevice />
           <ModalDialog @close="devicesSwitch = false" v-if="devicesSwitch">
             <template #title>选择投放设备</template>
@@ -48,15 +49,15 @@
       <!-- 播放器控制部分 -->
       <div class="controls" ref="controls">
         <!-- 播放模式选择 -->
-        <div class="loop" @click="toggleLoopType" v-if="!isMiniPlayer">
+        <div class="loop" @click.stop="toggleLoopType" v-if="!isMiniPlayer">
           <IconRepeatOne v-if="loopType === 0" />
           <IconRepeatAll v-if="loopType === 1" />
           <IconRandom v-if="loopType === 2" />
         </div>
         <div class="prev">
-          <IconMusicPrev @click="prevTrack" />
+          <IconMusicPrev @click.stop="prevTrack" />
         </div>
-        <div class="audio_state" @click="togglePlay">
+        <div class="audio_state" @click.stop="togglePlay">
           <img :src="currentTrack.cover" alt="" ref="audioState" class="cover">
           <div class="audio_state_icon">
             <IconMusicPause v-if="playState" />
@@ -64,11 +65,11 @@
           </div>
         </div>
         <div class="next">
-          <IconMusicNext @click="nextTrack" />
+          <IconMusicNext @click.stop="nextTrack" />
         </div>
         <!-- 收缩列表 -->
         <div class="shrink" v-if="!isMiniPlayer">
-          <IconShrink @click="isMiniPlayer = true" />
+          <IconShrink @click.stop="isMiniPlayer = true" />
         </div>
       </div>
 
@@ -145,7 +146,7 @@ const loopList = ['单曲循环', '全部循环', '随机播放'];
 
 const lyricOffsetY = ref("calc( var(--lyh) / 2 )");
 // 滚动偏移量
-const lyricOffset = ref(lyricOffsetY.value);
+const lyricOffset = ref('0px');
 
 // 滚动歌词容器的引用
 const lyricsContainer = ref(null);
@@ -477,21 +478,71 @@ const parseLyrics = (lyric) => {
 
 // 更新歌词偏移，确保当前歌词在视野中
 const updateLyricOffset = () => {
+  // 确保歌词容器已经挂载
+  if (!lyricsContainer.value || currentLyric.value.length === 0) {
+    return;
+  }
+  
+  // 获取歌词容器的实际高度
+  const containerHeight = lyricsContainer.value.clientHeight;
+  
+  // 查找当前应该显示的歌词行索引
   const currentLyricIndex = currentLyric.value.findIndex((line) => line.time > currentTime.value);
-  // 防止歌曲结束后偏移量重置
+  
+  // 获取歌词元素
+  const lyricElement = lyricsContainer.value.querySelector('.lyrics');
+  if (!lyricElement) {
+    return;
+  }
+  
+  // 获取所有歌词行
+  const lines = lyricElement.querySelectorAll('div');
+  if (lines.length === 0) {
+    return;
+  }
+  
+  // 获取单行歌词的实际高度
+  const lineHeight = lines[0].clientHeight;
+  
+  let offset = 0;
+  
+  // 处理不同的情况
   if (currentTime.value <= duration.value) {
     if (currentLyricIndex > 0) {
-      //每一行高度不固定，要根据元素的实际高度来计算
-      lyricOffset.value = `calc( ( ${currentLyricIndex - 1} * -1 ) * var(--lh) + ${lyricOffsetY.value} )`;
-      // lyricOffset.value = (currentLyricIndex - 1) * 18 + 10; // 30px 代表每行歌词的高度
-      // console.log('%csrc\components\Player.vue:236 (currentLyricIndex - 1)  * 18 + 10 ', 'color: #007acc;', (currentLyricIndex - 1) * 18 + 10);
+      // 正常播放状态，当前行是currentLyricIndex - 1
+      offset = -(currentLyricIndex - 1) * lineHeight + (containerHeight - lineHeight) / 2;
+    } else if (currentLyricIndex === 0) {
+      // 第一行歌词，显示在顶部偏下一点
+      offset = (containerHeight - lineHeight) / 2;
+    } else if (currentLyricIndex === -1) {
+      // 找不到比当前时间大的歌词行，显示最后一行
+      offset = -(currentLyric.value.length - 1) * lineHeight + (containerHeight - lineHeight) / 2;
     }
   } else {
-    // 如果歌曲结束，保持在最后一行
-    lyricOffset.value = `calc( ${currentLyric.value.length - 1} * -1 * var(--lh) * var(--lh) + ${lyricOffsetY.value} )`;
+    // 歌曲结束，显示最后一行
+    offset = -(currentLyric.value.length - 1) * lineHeight + (containerHeight - lineHeight) / 2;
   }
+  
+  // 设置偏移量，确保当前歌词行在视口中居中
+  lyricOffset.value = `${offset}px`;
 };
+// 在onMounted中添加对窗口大小变化的监听，确保响应式调整
+onMounted(() => {
+  // ... existing code ...
+  
+  // 添加窗口大小变化的监听
+  window.addEventListener('resize', updateLyricOffset);
+  
+  // 初始计算一次歌词偏移
+  nextTick(() => {
+    updateLyricOffset();
+  });
+});
 
+// 组件卸载时移除监听
+onUnmounted(() => {
+  window.removeEventListener('resize', updateLyricOffset);
+});
 /**
  * 判断当前行是否为当前时间对应的歌词行
  * @param {number} index - 歌词行的索引
@@ -551,7 +602,7 @@ watch(() => playState.value, (value) => {
 
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
 .wordType {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -559,66 +610,97 @@ watch(() => playState.value, (value) => {
   word-break: break-all;
 }
 
+// 根级CSS变量 - 全局主题控制
+:root {
+  // 颜色变量
+  --primary-color: #D81159;
+  --text-color: #2d2d33;
+  --text-secondary: #a2a9af;
+  --background-color: #ffffff;
+  --border-radius: 12px;
+  
+  // 响应式字体大小
+  --font-size-base: clamp(12px, 2vw, 16px);
+  --font-size-large: clamp(14px, 2.5vw, 18px);
+  --font-size-small: clamp(10px, 1.5vw, 14px);
+  
+  // 新增：统一的内边距变量
+  --content-padding: 16px;
+}
+
+// 深色模式支持
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #EC4899;
+    --text-color: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --background-color: #111827;
+  }
+}
+
 .music_player_wrapper {
   display: flex;
   flex-direction: column-reverse;
   background-color: var(--background-color);
   box-sizing: border-box;
-  display: -webkit-box;
-  display: -webkit-flex;
-  display: -ms-flexbox;
-  display: flex;
   justify-content: space-between;
   bottom: 0;
+  left:0;
   z-index: 99;
-  position: -webkit-sticky;
   position: fixed;
   color: var(--text-color);
-  width: 100vw;
-  --lh: 8.467vw;
-  --fz: 5.333vw;
+  width: 100%;
+  height: 100vh;
+  --lh: clamp(28px, 5vw, 40px);
+  --fz: var(--font-size-base);
 
   .music_player_box {
-    width: 100vw;
-    --size: clamp(50px, 20vw, 100px);
+    width: 100%;
+    --size: clamp(40px, 12vw, 80px);
   }
 
   .music_info {
-    font-size: var(--fz);
-    width: 90vw;
-    height: 16vw;
+    font-size: var(--font-size-large);
+    width: 90%;
+    max-width: 800px;
+    margin: 0 auto;
+    height: auto;
+    padding: 12px 0;
 
     .music_name {
       display: flex;
       font-weight: bold;
       justify-content: space-between;
+      align-items: center;
 
       svg {
-        width: 6vw;
-        height: 6vw;
+        width: clamp(20px, 4vw, 32px);
+        height: clamp(20px, 4vw, 32px);
       }
 
       .stared {
-        fill: #D81159;
+        fill: var(--primary-color);
       }
     }
 
     .music_singer {
-      font-size: calc(var(--fz) * 0.7);
+      font-size: var(--font-size-small);
       font-weight: normal;
-      color: #a2a9af;
+      color: var(--text-secondary);
     }
   }
 
   .device_setting {
     display: flex;
-    width: 90vw;
+    width: 90%;
+    max-width: 800px;
+    margin: 0 auto 12px auto;
     justify-content: end;
-    margin-bottom: 1vh;
-    gap: 4vw;
+    gap: clamp(12px, 3vw, 24px);
+    align-items: center;
 
     .current_device_name {
-      font-size: calc(var(--fz) * 0.8);
+      font-size: var(--font-size-small);
       font-weight: normal;
     }
 
@@ -629,7 +711,11 @@ watch(() => playState.value, (value) => {
 
   .controls {
     display: flex;
-    gap: 20vw;
+    gap: clamp(40px, 12vw, 120px);
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 12px 0;
 
     .prev,
     .next,
@@ -639,11 +725,22 @@ watch(() => playState.value, (value) => {
       display: flex;
       justify-content: center;
       align-items: center;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .prev:active,
+    .next:active,
+    .audio_state:active,
+    .loop:active,
+    .shrink:active {
+      transform: scale(0.95);
     }
 
     svg {
       width: calc(var(--size) * 0.4);
       height: calc(var(--size) * 0.4);
+      color: var(--text-color);
     }
   }
 
@@ -651,7 +748,8 @@ watch(() => playState.value, (value) => {
     display: flex;
     justify-content: center;
     align-content: center;
-    width: 80vw;
+    width: 80%;
+    max-width: 600px;
     margin: 0 auto;
     font-size: initial;
     line-height: initial;
@@ -663,21 +761,22 @@ watch(() => playState.value, (value) => {
     .cover {
       width: var(--size);
       height: var(--size);
-      background-size: var(--size) var(--size);
-      border-radius: var(--size);
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       position: absolute;
     }
 
     .audio_state_icon {
       display: flex;
       align-items: center;
-      padding: .5rem;
-      opacity: .8;
-      background: #f0f0f0;
-      border-radius: var(--size);
+      padding: 0.5rem;
+      opacity: 0.8;
+      background: rgba(240, 240, 240, 0.9);
+      border-radius: 50%;
       width: calc(var(--size) * 0.5);
       height: calc(var(--size) * 0.5);
       justify-content: center;
+      z-index: 10;
     }
 
     svg {
@@ -689,19 +788,20 @@ watch(() => playState.value, (value) => {
 
   .lyrics-container {
     flex: 1;
-    height: 500px;
-    overflow-y: auto;
     position: relative;
     -moz-user-select: none;
     -webkit-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    font-size: 4.333vw;
-    line-height: var(--lh);
+    font-size: clamp(16px, 4.333vw, 24px); // 使用clamp确保在各种屏幕尺寸下都有合适的字体大小
+    line-height: 2; // 增加行高，提高可读性
     font-weight: normal;
     --lyh: 18vh;
     height: var(--lyh);
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .lyrics-container:active {
@@ -710,117 +810,207 @@ watch(() => playState.value, (value) => {
 
   .lyrics {
     position: absolute;
-    transition: top 0.3s linear;
+    transition: top 0.3s ease-out; // 使用ease-out使动画更平滑
+    width: 100%;
   }
 
-  .lyrics>div {
+.lyrics > div {
     text-align: center;
     width: 96vw;
-    padding: 0 2vw;
+    padding: 0.5rem 2vw; // 增加上下内边距，提高可读性
   }
+  
 
   .lyrics_none {
     display: flex;
     justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-secondary);
   }
+
 
   .current {
     color: red;
+    font-weight: bold; // 当前行加粗，提高可见性
+    transform: scale(1.1); // 当前行稍微放大，突出显示
   }
 
   .time_display {
     display: flex;
     justify-content: space-between;
-    width: 80vw;
-    margin: 0 auto;
+    width: 80%;
+    max-width: 600px;
+    margin: 8px auto;
+    font-size: var(--font-size-small);
+    color: var(--text-secondary);
   }
 
   .volume {
     position: fixed;
-    right: 0;
+    right: 2%;
     top: 50%;
+    transform: translateY(-50%);
     z-index: 99;
-    //transform: translateX(40%) translateY(-50%) rotate(-90deg);
+    max-width: 50px;
   }
 
   .cover_wrapper {
     height: 36vh;
-    display: flex;
     justify-content: center;
     align-items: center;
     padding: 1vw;
+    display: flex;
+    margin: 0 auto;
+    box-sizing: border-box;
 
     .cover {
       --c-size: clamp(8rem, 80vw, 36vh);
       width: var(--c-size);
       height: var(--c-size);
-      ;
-      border-radius: 4vw;
+      border-radius: var(--border-radius);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
   }
 }
 
 .mini {
   flex-direction: row;
+  height: auto;
+  max-height: 80px;
 
   .controls {
-    gap: 20vw;
+    gap: clamp(30px, 15vw, 80px);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 28vw;
-    box-shadow: 8px 0px 5px 0px rgba(0, 0, 0, 0.1);
+    height: 80px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   }
-
 }
 
 .full {
   top: 0;
   overflow: hidden;
+  padding: 20px 0;
 
   .music_player_box {
-    height: 26vh;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .controls {
     display: flex;
-    gap: 10vw;
+    gap: clamp(40px, 12vw, 100px);
     justify-content: center;
     align-content: center;
+    padding: 20px 0;
 
     .loop svg,
     .shrink svg {
-      fill: #a2a9af;
+      fill: var(--text-secondary);
     }
   }
-
-
 }
 
 .rotate {
-  animation: coverRotate 5s linear infinite;
+  animation: coverRotate 10s linear infinite;
 }
 
 @keyframes coverRotate {
-  from {
-    transform: rotate(0deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
-  to {
-    transform: rotate(360deg);
+// 电脑端特定优化
+@media (min-width: 1024px) {
+  .music_player_wrapper {
+    .device_setting,
+    .music_info,
+    .progress_bar,
+    .time_display {
+      max-width: 800px;
+    }
+    
+    --fz: 16px; // 固定电脑端字体大小
+  }
+  
+  .full {
+    padding: 40px 0;
+  }
+  
+  .lyrics-container {
+    --lyh: 300px; // 固定电脑端歌词区域高度
+  }
+  
+  .cover_wrapper {
+    height: 300px;
+    
+    .cover {
+      --c-size: 280px;
+    }
+  }
+}
+// 添加媒体查询，优化电脑端显示
+@media (min-width: 1024px) {
+  .music_player_wrapper {
+    .lyrics-container {
+      font-size: 20px; // 电脑端固定字体大小
+      height: 250px; // 电脑端固定高度
+    }
+  }
+}
+// 平板优化
+@media (min-width: 768px) and (max-width: 1023px) {
+  .music_player_wrapper {
+    .controls {
+      gap: clamp(60px, 15vw, 100px);
+    }
+  }
+}
+
+// 移动端优化
+@media (max-width: 767px) {
+  .music_player_wrapper {
+    .device_setting {
+      margin-bottom: 8px;
+    }
+    
+    .controls {
+      gap: clamp(30px, 12vw, 60px);
+    }
+    
+    .cover_wrapper {
+      height: 250px;
+    }
+  }
+  
+  .mini {
+    max-height: 70px;
+    
+    .controls {
+      height: 70px;
+    }
   }
 }
 
 @media (prefers-color-scheme: dark) {
   .music_player_wrapper {
+    background-color: var(--background-color);
+    
     .controls {
-
       .prev svg,
       .next svg {
         fill: var(--text-color);
       }
     }
+    
+    .audio_state_icon {
+      background: rgba(255, 255, 255, 0.1);
+    }
   }
-
 }
 </style>
